@@ -33,6 +33,14 @@
         android:minLines="2" />
 
     <Button
+        android:id="@+id/actionDownload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:enabled="false"
+        android:text="下载到应用目录" />
+
+    <Button
         android:id="@+id/actionParse"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -12,6 +12,9 @@ import com.yohu.lib_urlparse.api.ParseFailure;
 import com.yohu.lib_urlparse.api.UrlParseRequest;
 import com.yohu.lib_urlparse.api.UrlParseResult;
 import com.yohu.urldown.databinding.ActivityMainBinding;
+import com.yohu.urldown.download.DownloadPipeline;
+
+import java.io.File;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -27,12 +30,21 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private volatile UrlParseResult lastResult;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        // 下载引擎必须在用之前初始化；此前漏了这一步，导致点下载直接失败。
+        try {
+            com.yohu.urldown.download.AssetDownloader.init(this,
+                    new java.io.File(getExternalFilesDir(null), "downloads"));
+        } catch (Throwable t) {
+            android.util.Log.w("YoUrlDown", "下载引擎初始化失败: " + t);
+        }
 
         binding.actionParse.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -45,6 +57,13 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 startParse(input);
+            }
+        });
+
+        binding.actionDownload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                downloadLast();
             }
         });
 
@@ -64,21 +83,57 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 String text;
+                UrlParseResult parsed = null;
                 try {
-                    UrlParseResult r = EngineBootstrap.engine(MainActivity.this)
+                    parsed = EngineBootstrap.engine(MainActivity.this)
                             .parse(UrlParseRequest.builder(input).build());
-                    text = render(r);
+                    text = render(parsed);
                 } catch (ParseFailure f) {
                     text = renderFailure(f);
                 } catch (Throwable t) {
                     text = "解析异常: " + t;
                 }
                 final String finalText = text;
+                final UrlParseResult finalResult = parsed;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         binding.output.setText(finalText);
                         binding.actionParse.setEnabled(true);
+                        lastResult = finalResult;
+                        binding.actionDownload.setEnabled(finalResult != null
+                                && !finalResult.downloadable().isEmpty());
+                    }
+                });
+            }
+        });
+    }
+
+    private void downloadLast() {
+        final UrlParseResult r = lastResult;
+        if (r == null || r.downloadable().isEmpty()) {
+            Toast.makeText(this, "没有可下载的媒体", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        binding.actionDownload.setEnabled(false);
+        binding.output.setText("下载中…\n" + r.title());
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                String text;
+                try {
+                    File dir = new File(getExternalFilesDir(null), "downloads");
+                    DownloadPipeline.Report report = DownloadPipeline.download(r, dir);
+                    text = (report.success ? "下载完成\n\n" : "下载未成功\n\n") + report.text();
+                } catch (Throwable t) {
+                    text = "下载异常: " + t;
+                }
+                final String finalText2 = text;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        binding.output.setText(finalText2);
+                        binding.actionDownload.setEnabled(true);
                     }
                 });
             }

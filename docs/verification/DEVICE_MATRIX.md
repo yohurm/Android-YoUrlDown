@@ -55,3 +55,24 @@ adb shell am start -n com.yohu.urldown/.MainActivity -e url "https://www.bilibil
 sleep 15
 adb shell uiautomator dump /sdcard/ui.xml && adb shell cat /sdcard/ui.xml
 ```
+## 下载链路验证（本轮新增）
+
+| 项 | 结果 |
+| --- | --- |
+| 输入 | 今日头条 `i7035542323689685535` |
+| 动作 | 解析成功后点「下载到应用目录」 |
+| 落盘目录 | `/storage/emulated/0/Android/data/com.yohu.urldown/files/downloads` |
+| 文件名 | `"直接当场就社会性死亡了！".mp4`（标题清洗生效：中文与引号保留、非法字符替换） |
+| 大小 | 26,215,444 B |
+| 容器校验 | `MP4` ✅（按文件头字节判定，不是看状态码） |
+
+### 本轮修掉的一个真实缺陷
+
+点下载后**应用进程直接消失**：`AssetDownloader.init(...)` 从未被调用，
+`YoDownload.enqueue` 在未初始化状态下失败，异常又发生在后台线程 → 进程被打死。
+
+修复：
+1. `MainActivity.onCreate` 中初始化下载引擎；
+2. 下载流程整体 try/catch，任何异常都变成界面上的「下载异常: …」而不是杀进程。
+
+修复后重测：下载完成、容器校验通过。
