@@ -59,8 +59,14 @@ foreach ($c in $cases) {
     }
     & $Adb shell am force-stop com.yohu.urldown 2>&1 | Out-Null
     & $Adb shell am start -n com.yohu.urldown/.MainActivity -e url $c.Url 2>&1 | Out-Null
-    Start-Sleep -Seconds 22
-    $xml = Dump-Ui
+    # 轮询到结果出现为止（最多 ~36s）：固定 sleep 会因页面/网络快慢而误判"无结论"，
+    # 这在视频号那次已经发生过一次（实际是 CREDENTIALS_MISSING，却被记成无结论）。
+    $xml = ""
+    for ($i = 0; $i -lt 12; $i++) {
+        Start-Sleep -Seconds 3
+        $xml = Dump-Ui
+        if ($xml -match 'text="(平台:|解析失败)') { break }
+    }
     $ok = [regex]::Match($xml, 'text="(平台:[^"]{10,})"')
     if ($ok.Success) {
         $text = Unescape $ok.Groups[1].Value
@@ -72,7 +78,7 @@ foreach ($c in $cases) {
         Write-Host "[$platform] 通过 通道=$channel 媒体=$media"
         continue
     }
-    $fail = [regex]::Match($xml, 'text="(解析失败[^"]{10,400})"')
+    $fail = [regex]::Match($xml, 'text="(解析失败[^"]{10,2000})"')
     if ($fail.Success) {
         $text = Unescape $fail.Groups[1].Value
         $reason = ([regex]::Match($text, "原因:\s*(\w+)")).Groups[1].Value
