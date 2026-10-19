@@ -21,6 +21,9 @@ public final class MediaAsset {
     private final String url;
     private final String mimeType;
     private final long sizeBytes;
+    private final long durationMs;
+    private final int width;
+    private final int height;
     private final Map<String, String> headers;
 
     private MediaAsset(Builder b) {
@@ -28,6 +31,9 @@ public final class MediaAsset {
         this.url = b.url;
         this.mimeType = b.mimeType;
         this.sizeBytes = b.sizeBytes;
+        this.durationMs = b.durationMs;
+        this.width = b.width;
+        this.height = b.height;
         this.headers = Collections.unmodifiableMap(new LinkedHashMap<>(b.headers));
     }
 
@@ -65,6 +71,21 @@ public final class MediaAsset {
         return sizeBytes;
     }
 
+    /** 时长（毫秒）；未知为 {@code -1}。主要对视频有意义。 */
+    public long durationMs() {
+        return durationMs;
+    }
+
+    /** 视频宽（像素）；未知为 {@code 0}。 */
+    public int width() {
+        return width;
+    }
+
+    /** 视频高（像素）；未知为 {@code 0}。 */
+    public int height() {
+        return height;
+    }
+
     /** 下载该条目应携带的请求头（只读）。 */
     public Map<String, String> headers() {
         return headers;
@@ -81,6 +102,9 @@ public final class MediaAsset {
         private final String url;
         private String mimeType;
         private long sizeBytes = -1L;
+        private long durationMs = -1L;
+        private int width;
+        private int height;
         private final Map<String, String> headers = new LinkedHashMap<>();
 
         Builder(Kind kind, String url) {
@@ -95,6 +119,17 @@ public final class MediaAsset {
 
         public Builder sizeBytes(long v) {
             this.sizeBytes = v;
+            return this;
+        }
+
+        public Builder durationMs(long v) {
+            this.durationMs = v;
+            return this;
+        }
+
+        public Builder dimension(int w, int h) {
+            this.width = w > 0 ? w : 0;
+            this.height = h > 0 ? h : 0;
             return this;
         }
 
