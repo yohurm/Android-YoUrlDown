@@ -176,8 +176,8 @@ public final class DouyinWebProvider implements ParseProvider {
         return result;
     }
 
-    /** 把 {@code item_list[0]} 映射成结果。返回新增媒体数。 */
-    private static int fillFromItem(UrlParseResult.Builder out, JSONObject item, String awemeId) {
+    /** 把 {@code item_list[0]} 映射成结果。返回新增媒体数。包内可见：webview 通道复用。 */
+    static int fillFromItem(UrlParseResult.Builder out, JSONObject item, String awemeId) {
         String title = DouyinWebRules.title(item);
         if (title != null) {
             out.title(title);
