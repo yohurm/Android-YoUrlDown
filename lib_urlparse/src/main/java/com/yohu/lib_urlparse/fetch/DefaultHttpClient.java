@@ -180,7 +180,12 @@ public final class DefaultHttpClient implements HttpClient {
                 if (e.getKey() == null || e.getValue() == null || e.getValue().isEmpty()) {
                     continue;
                 }
-                responseHeaders.put(e.getKey().toLowerCase(Locale.ROOT), e.getValue().get(0));
+                String name = e.getKey().toLowerCase(Locale.ROOT);
+                // Set-Cookie 必须保留**全部**取值：同名 Cookie 的不同属性/不同 Cookie 会分多条下发，
+                // 只留第一条会丢掉会话状态（B 站风控要求 buvid3 与 buvid4 同时带上）。
+                // 用换行分隔，避免与 Cookie 值里合法的逗号（Expires 日期）混淆。
+                String join = "set-cookie".equals(name) ? "\n" : ", ";
+                responseHeaders.put(name, String.join(join, e.getValue()));
             }
 
             String finalUrl = conn.getURL() == null ? url : conn.getURL().toString();

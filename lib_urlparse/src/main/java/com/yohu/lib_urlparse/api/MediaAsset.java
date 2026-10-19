@@ -1,7 +1,9 @@
 package com.yohu.lib_urlparse.api;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,6 +27,7 @@ public final class MediaAsset {
     private final int width;
     private final int height;
     private final Map<String, String> headers;
+    private final List<String> alternates;
 
     private MediaAsset(Builder b) {
         this.kind = b.kind;
@@ -35,6 +38,7 @@ public final class MediaAsset {
         this.width = b.width;
         this.height = b.height;
         this.headers = Collections.unmodifiableMap(new LinkedHashMap<>(b.headers));
+        this.alternates = Collections.unmodifiableList(new ArrayList<>(b.alternates));
     }
 
     public static Builder video(String url) {
@@ -86,6 +90,16 @@ public final class MediaAsset {
         return height;
     }
 
+    /**
+     * 备用地址（只读）：同一内容的其它 CDN 或镜像。
+     *
+     * <p>为什么需要：CDN 地址常带时效签名，主地址可能 403，而同一清晰度的 backupUrl
+     * 往往指向另一台机器。下载层在主地址失败时应依次尝试这些备用地址。
+     */
+    public List<String> alternates() {
+        return alternates;
+    }
+
     /** 下载该条目应携带的请求头（只读）。 */
     public Map<String, String> headers() {
         return headers;
@@ -106,6 +120,7 @@ public final class MediaAsset {
         private int width;
         private int height;
         private final Map<String, String> headers = new LinkedHashMap<>();
+        private final List<String> alternates = new ArrayList<>();
 
         Builder(Kind kind, String url) {
             this.kind = kind;
@@ -130,6 +145,14 @@ public final class MediaAsset {
         public Builder dimension(int w, int h) {
             this.width = w > 0 ? w : 0;
             this.height = h > 0 ? h : 0;
+            return this;
+        }
+
+        /** 追加一个备用地址（CDN 镜像）。 */
+        public Builder alternate(String url) {
+            if (url != null && !url.isEmpty()) {
+                alternates.add(url);
+            }
             return this;
         }
 
