@@ -1,0 +1,24 @@
+plugins {
+    id 'com.android.application' version '9.4.1' apply false
+    id 'com.android.library' version '9.4.1' apply false
+}
+
+// 各模块用 Java 21 的集合/流 API（List.of、Stream.toList 等），而 minSdk 低于 24 时
+// 这些 API 不在运行时可用的范围内；语言脱糖不带运行时实现，所以每个 Android 模块
+// 都必须打开 core library desugaring。对齐 GGEC-Android-EarBuds 的做法。
+def configureAndroidCoreLibraryDesugaring = { Project androidProject ->
+    def androidExtension = androidProject.extensions.getByName('android')
+    androidExtension.compileOptions.coreLibraryDesugaringEnabled = true
+    androidProject.dependencies.add(
+            'coreLibraryDesugaring',
+            'com.android.tools:desugar_jdk_libs:2.1.5')
+}
+
+subprojects { androidProject ->
+    androidProject.pluginManager.withPlugin('com.android.application') {
+        configureAndroidCoreLibraryDesugaring(androidProject)
+    }
+    androidProject.pluginManager.withPlugin('com.android.library') {
+        configureAndroidCoreLibraryDesugaring(androidProject)
+    }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 占位启动图标：骨架阶段不引入 bitmap 资源，用一个简单矢量即可满足清单引用。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#1B6EF3"
+        android:pathData="M4,4h40v40h-40z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,15h20v4h-20zM14,23h13v4h-13zM14,31h20v2h-20z" />
+</vector>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 库模块不自带权限声明：权限由消费方（app）按需声明。
+     这条约定来自参考工程 lib_common 的 checkLibCommonManifestOwnership 校验。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

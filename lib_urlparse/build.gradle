@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.yohu.lib_urlparse'
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
+
+    defaultConfig {
+        // 库模块保持更低的 minSdk，让宿主工程可以自己决定下限（参考工程同此约定）。
+        minSdk 24
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.annotation:annotation:1.9.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    // android.jar 里的 org.json 是抛异常的桩，单测需要真实实现。
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+}
+
+tasks.withType(Test).configureEach {
+    // 同上：把 mockable android.jar 从单测 classpath 里剔除，避免踩到桩实现。
+    classpath = classpath.filter { file ->
+        def name = file.name
+        name != 'android.jar' && !name.startsWith('mockable-android')
+    }
+}

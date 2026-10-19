@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">YoUrlDown</string>
+    <string name="home_title">YoUrlDown</string>
+    <string name="home_subtitle">链接解析与下载（工程骨架，业务逻辑待接入）</string>
+    <string name="home_input_hint">粘贴分享文本或链接</string>
+    <string name="home_action_parse">解析</string>
+</resources>

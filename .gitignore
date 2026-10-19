@@ -1,0 +1,53 @@
+# YoAgentDocs common — 每个仓库先贴这一份。
+# 点目录默认不提交（.idea / .vscode / .gradle / .hvigor / .kotlin / .cxx / .cursor 等）。
+# 尾斜杠只匹配目录；.gitignore、.editorconfig、.gitattributes 仍可跟踪。
+
+.*/
+
+# GitHub / Gitee 工作流与 issue 模板是仓库元数据，不是编辑器缓存。
+# 本仓库不用 Actions 时删掉下面两行。
+!.github/
+!.github/**
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*~
+
+# 密钥与本机环境（示例文件反向包含）
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.p12
+*.pfx
+
+# 日志与临时文件
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Android overlay — 接在 common 之后。
+# .gradle / .idea / .kotlin / .cxx / .externalNativeBuild 已由 .*/ 覆盖。
+
+build/
+captures/
+local.properties
+*.iml
+*.apk
+*.aab
+*.ap_
+output-metadata.json
+*.hprof
+
+# 签名与 Firebase 密钥。若团队约定入库 google-services.json，删掉下一行。
+*.jks
+*.keystore
+google-services.json

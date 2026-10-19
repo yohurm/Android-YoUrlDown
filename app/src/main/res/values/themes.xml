@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 仅用 AppCompat 自带主题，避免在骨架阶段引入额外的设计系统依赖。
+         后续接入设计系统时，把 parent 换成对应主题即可。 -->
+    <style name="Theme.YoUrlDown" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>
