@@ -7,7 +7,10 @@ import com.yohu.lib_urlparse.fetch.DefaultHttpClient;
 import com.yohu.lib_urlparse.provider.bilibili.BilibiliProvider;
 import com.yohu.lib_urlparse.provider.douyin.DouyinWebProvider;
 import com.yohu.lib_urlparse.provider.douyin.DouyinWebviewProvider;
+import com.yohu.lib_urlparse.provider.cloud.CloudApiProvider;
 import com.yohu.lib_urlparse.provider.instagram.InstagramEmbedProvider;
+import com.yohu.lib_urlparse.provider.wechat.WechatChannelsProvider;
+import com.yohu.lib_urlparse.provider.wechat.WechatMpProvider;
 import com.yohu.lib_urlparse.provider.sniffer.SnifferProvider;
 import com.yohu.lib_urlparse.provider.toutiao.ToutiaoWebProvider;
 import com.yohu.lib_urlparse.provider.weibo.WeiboProvider;
@@ -60,6 +63,9 @@ public final class EngineBootstrap {
                 .provider(new DouyinWebProvider())
                 .provider(new DouyinWebviewProvider())
                 .provider(new InstagramEmbedProvider())
+                .provider(new WechatMpProvider())
+                .provider(new WechatChannelsProvider())
+                .provider(new CloudApiProvider())
                 .provider(new SnifferProvider())
                 .service(JsEvaluator.class, new WebViewJsEvaluator(appContext))
                 .service(PageSniffer.class, new WebViewPageSniffer(appContext))
