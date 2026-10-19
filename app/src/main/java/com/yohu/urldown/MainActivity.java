@@ -47,6 +47,14 @@ public class MainActivity extends AppCompatActivity {
                 startParse(input);
             }
         });
+
+        // 支持外部带入链接（adb / 分享），便于自动化真机验证：
+        //   adb shell am start -n com.yohu.urldown/.MainActivity -e url "<链接>"
+        String extra = getIntent() == null ? null : getIntent().getStringExtra("url");
+        if (extra != null && !extra.trim().isEmpty()) {
+            binding.input.setText(extra);
+            startParse(extra.trim());
+        }
     }
 
     private void startParse(final String input) {

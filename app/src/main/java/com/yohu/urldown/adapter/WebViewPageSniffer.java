@@ -78,7 +78,19 @@ public final class WebViewPageSniffer implements PageSniffer {
 
                     @Override
                     public void onPageFinished(WebView view, String url) {
-                        loaded.countDown();
+                        // 取标题：拦截页/验证页的判定依赖它，而 WebView 不会把标题交给我们。
+                        view.evaluateJavascript("document.title", value -> {
+                            if (value != null) {
+                                String t = value.trim();
+                                if (t.length() >= 2 && t.startsWith("\"") && t.endsWith("\"")) {
+                                    t = t.substring(1, t.length() - 1);
+                                }
+                                if (!"null".equals(t) && !t.isEmpty()) {
+                                    documentTitle = t;
+                                }
+                            }
+                            loaded.countDown();
+                        });
                     }
                 });
                 webView = wv;
@@ -97,11 +109,15 @@ public final class WebViewPageSniffer implements PageSniffer {
 
         SniffResult.Builder out = SniffResult.builder()
                 .finalUrl(pageUrl)
+                .title(documentTitle)
                 .requestCount(seen.size())
                 .timedOut(System.currentTimeMillis() >= deadline)
                 .candidates(new java.util.ArrayList<>(seen.values()));
         return out.build();
     }
+
+    /** 页面标题：拦截页判据依赖它（没有标题就无法区分"作品页"与"验证/错误页"）。 */
+    private volatile String documentTitle;
 
     /** 只为满足"release 后不再引用旧结果"的语义而保留的字段（不参与业务判断）。 */
     private volatile Map<String, SniffResult.Candidate> collected;

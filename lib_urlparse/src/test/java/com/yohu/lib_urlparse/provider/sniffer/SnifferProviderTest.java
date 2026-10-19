@@ -183,4 +183,30 @@ public class SnifferProviderTest {
         assertEquals(Platform.PIPIXIA, SnifferProvider.inferPlatform("https://h5.pipix.com/item/1"));
         assertEquals(Platform.UNKNOWN, SnifferProvider.inferPlatform("https://example.test/x"));
     }
+    @Test
+    public void imagesOnlyOnVideoPlatformIsNoMediaFound() {
+        // 回归：快手验证页曾被嗅探成"12 张图片"并报成功（那些是头像/图标）。
+        // 快手不是图集类平台，因此"只有图片"必须判为可疑页而不是成功。
+        SniffResult r = result("快手 - 记录美好生活", "https://v.kuaishou.com/abcdef",
+                new SniffResult.Candidate("https://p66.a.kwimgs.com/uhead/AB/xxx.jpg",
+                        "image/jpeg", null, 2048L),
+                new SniffResult.Candidate("https://p66.a.kwimgs.com/uhead/AB/yyy.jpg",
+                        "image/jpeg", null, 2048L));
+        ParseFailure f = assertThrows(ParseFailure.class,
+                () -> engine(new FakeSniffer(r))
+                        .parse(UrlParseRequest.builder("https://v.kuaishou.com/abcdef").build()));
+        assertEquals(FailureReason.NO_MEDIA_FOUND, f.reason());
+        assertTrue("必须说明是可疑页而不是作品: " + f.getMessage(),
+                f.getMessage().contains("头像") || f.getMessage().contains("疑似"));
+    }
+
+    @Test
+    public void imagesOnlyOnGalleryPlatformIsAccepted() throws Exception {
+        // 对照组：小红书作品主体就是图片，不能误杀
+        SniffResult r = result("笔记", "https://www.xiaohongshu.com/explore/abc",
+                new SniffResult.Candidate("https://sns-img.test/a.jpg", "image/jpeg", null, 2048L));
+        UrlParseResult out = engine(new FakeSniffer(r))
+                .parse(UrlParseRequest.builder("https://www.xiaohongshu.com/explore/abc").build());
+        assertEquals(1, out.assets(MediaAsset.Kind.IMAGE).size());
+    }
 }

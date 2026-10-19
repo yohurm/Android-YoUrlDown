@@ -132,6 +132,18 @@ public final class SnifferProvider implements ParseProvider {
         }
 
         UrlParseResult result = out.build();
+        // 假通过防线：只有图片、没有任何视频/音频，且该平台的作品主体通常不是图片时，
+        // 这些小图多半是头像/图标/验证页装饰，而不是作品内容。
+        // 实测：快手验证页被嗅探成"12 张图片"报成功，就是这一类。
+        boolean onlyImages = result.assets(MediaAsset.Kind.VIDEO).isEmpty()
+                && result.assets(MediaAsset.Kind.AUDIO).isEmpty()
+                && !result.assets(MediaAsset.Kind.IMAGE).isEmpty();
+        if (onlyImages && !galleryProne(finalUrl)) {
+            throw new ParseFailure(FailureReason.NO_MEDIA_FOUND, channel(),
+                    "只嗅到 " + result.assets(MediaAsset.Kind.IMAGE).size()
+                            + " 张图片、没有视频/音频，且该平台作品主体不是图片："
+                            + "疑似验证页/错误页上的头像与图标，不当作解析成功。");
+        }
         if (result.assets().isEmpty()) {
             throw new ParseFailure(FailureReason.NO_MEDIA_FOUND, channel(),
                     "页面里没有可下载媒体（请求数=" + sniffed.requestCount()
