@@ -36,6 +36,7 @@
 | B0 仓库骨架 + 配置对齐 | ✅ 完成 |
 | B1 `api`/`spi`/`util` + `core` 调度 + 三个边界校验任务 | ✅ 完成（31 文件 / 2,821 行，33 单测绿） |
 | 下载引擎合入（原 `lib_common`） | ✅ 完成（`lib_download`，37 文件 / 4,004 行，见 `05`） |
+| B2 `fetch`（java.net 实现：手动跟随重定向 / Cookie / gzip / 超时分类）+ `sniff` 判据层 | ✅ 完成（8 文件移植 + HTTP 重写，54 单测绿） |
 | B3 `rules` 规则层 | ⬜ 待做 |
 | B4/B5 12 个 provider | ⬜ 待做 |
 | B6 `transfer`（M3U8 / 命名 / 校验） | ⬜ 待做（单 URL 下载已由 `lib_download` 覆盖） |
