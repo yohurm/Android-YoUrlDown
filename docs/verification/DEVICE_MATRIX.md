@@ -1,78 +1,86 @@
 # 真机验证记录（NEPI4E0106 / Android 15）
 
-> 判定原则：**只记录实测到的结果**。没测的写"未测"，失败的写失败原因，不做推断填空。
-> 本轮验证的是"引擎在设备上能否端到端跑通"，不是"12 平台全部达标"。
+> **本文件是人工结论；逐条实测数据以自动产物 [`MATRIX_RUN.md`](MATRIX_RUN.md) 为准。**
+> 两者冲突时以 `MATRIX_RUN.md` 为准（它是脚本直接读设备界面得到的，不经人手）。
+>
+> 判定原则：**只记录实测到的结果**。没测的写「未验证」，失败的写具体原因，不推断、不填空、
+> 不用旧报告的结论替新实现背书。
 
-## 环境
+## 1. 环境
 
 | 项 | 值 |
 | --- | --- |
 | 设备 | motorola edge 60 pro（`NEPI4E0106`），Android 15 |
 | 安装包 | `app-debug.apk`（`adb install -r` Success） |
-| 驱动方式 | `adb shell am start -n com.yohu.urldown/.MainActivity -e url "<链接>"`（应用支持 intent extra，便于脚本化验证） |
+| 驱动方式 | `adb shell am start -n com.yohu.urldown/.MainActivity -e url "<链接>"` |
+| 复现命令 | `pwsh -File tools/device-matrix.ps1`（自动安装、逐条验证、生成矩阵） |
 
-## 结果
+## 2. 当前结论（已测 5 项：2 通过 / 3 失败；另 6 个平台未验证）
 
-| 平台 | 输入 | 通道 | 结果 | 证据 |
-| --- | --- | --- | --- | --- |
-| 哔哩哔哩 | `BV1HU4y1K7TT` | `bilibili.api` | ✅ 通过 | 标题「能力觉醒！颠覆四皇的极恶时代…」、作者「秃头的白小明」、视频 852×480 / 1700s、备用地址 2 条、音频 1 条 |
-| 今日头条 | `m.toutiao.com/i7035542323689685535/` | `toutiao.webpage` | ✅ 通过 | 标题「"直接当场就社会性死亡了！"」、作者「阿浪171」、视频 1 条 |
-| 快手 | `v.kuaishou.com/abcdef` | `sniffer.webview` | ❌ 失败 | `NO_MEDIA_FOUND`（修复假通过后如实失败，见下） |
-| Instagram | `/p/Ca3V3zGIZ08/` | — | ⚠️ 未测出结论 | 26s 内界面无结果文本（WebView 加载 + 网络不可达，等待超时） |
+| 平台 | 通道 | 结果 | 说明 |
+| --- | --- | --- | --- |
+| 哔哩哔哩 | `bilibili.api` | ✅ 通过 | 标题/作者/视频 852×480/1700s/备用地址 2 条/音频 1 条 |
+| 今日头条 | `toutiao.webpage` | ✅ 通过 | 标题/作者/视频 1 条 |
+| 微信视频号 | `wechat.channels` | ❌ `CREDENTIALS_MISSING` | 取流必须持有腾讯侧登录会话，且媒体是加密 MP4（需 `decode_key`） |
+| 快手 | `sniffer.webview` | ❌ `NO_MEDIA_FOUND` | 只嗅到 13 张图片、无视频/音频，判为验证页上的头像/图标 |
+| Instagram | `instagram.embed` | ❌ `NETWORK` | 请求 20s 超时，主机不可达（与旧报告同一原因） |
+| 抖音 / 小红书 / 微博 / 微视 / 皮皮虾 / 公众号 | — | ⬜ 未验证 | **缺当前有效分享链接**（分享链接有时效，旧样本不能复用） |
 
-## 本轮发现并修复的真实缺陷：嗅探通道的"假通过"
+## 3. 本轮发现并修复的真实缺陷（都有回归测试）
 
-**现象**：快手链接被 `sniffer.webview` 报成"成功，12 张图片"。那 12 张是页面头像/图标，不是作品。
+### 3.1 嗅探通道「假通过」
 
-**为什么危险**：假通过比失败危害大——失败会暴露，假通过会写进结论。
+- **现象**：快手链接被 `sniffer.webview` 报成"成功，12 张图片"，实为头像/图标。
+- **根因**：① `WebViewPageSniffer` 没带回页面标题 → `BlockPageDetector` 无标题可判；
+  ② `SnifferProvider` 只要嗅到任何媒体就报成功。
+- **修复**：取 `document.title` 写入结果；只有图片且平台非图集类时判 `NO_MEDIA_FOUND`。
+- **回归测试**：快手形态必须失败、小红书（图集类）必须照收。
 
-**根因**（两个叠加）：
-1. `WebViewPageSniffer` 没有把**页面标题**带回 `SniffResult`，导致 `BlockPageDetector` 无标题可判；
-2. `SnifferProvider` 只要嗅到任何媒体就报成功，"只有图片"这种形态没有防线。
+### 3.2 下载点一下就崩
 
-**修复**：
-1. 嗅探器在 `onPageFinished` 后用 `document.title` 取标题并写入结果；
-2. 嗅探通道增加防线：**只有图片、没有视频/音频，且该平台作品主体不是图片**时，判 `NO_MEDIA_FOUND` 并说明"疑似验证页/错误页上的头像与图标"；
-3. 补两条回归测试：快手形态必须失败、小红书（图集类）必须照收。
+- **现象**：点「下载到应用目录」后应用进程消失。
+- **根因**：`AssetDownloader.init(...)` 从未调用 → `YoDownload.enqueue` 失败 →
+  后台线程异常杀死进程。
+- **修复**：`onCreate` 初始化下载引擎；下载流程整体 `try/catch`，异常变成界面提示。
+- **验证**：头条视频 26,215,444 B 落盘，容器校验 `MP4` ✅。
 
-修复后真机重测：快手 → `解析失败 / NO_MEDIA_FOUND / sniffer.webview` ✅ 符合预期。
+### 3.3 通道写了但没注册
 
-## 尚未验证（如实标注）
+- **现象**：视频号链接被 `sniffer.webview` 接走，报 `NO_MEDIA_FOUND`。
+- **根因**：`wechat.mp` / `wechat.channels` / `cloud.api` 未注册进 `EngineBootstrap`
+  ——**单测全绿，设备上没有**。
+- **修复**：注册后真机实测视频号 → `wechat.channels` → `CREDENTIALS_MISSING`。
 
-| 平台 | 原因 |
+### 3.4 测量缺陷（同样会污染结论）
+
+- 矩阵脚本固定 `sleep 22s` → 视频号、Instagram 被误记为"无结论"；改为**轮询到结果出现**。
+- 失败文本正则上限 400 → 视频号的长英文详情匹配失败；放宽到 2000。
+
+## 4. 未验证项与补齐方式
+
+| 平台 | 需要什么 |
 | --- | --- |
-| 小红书 / 微博 / 抖音 / 微视 / 皮皮虾 / 公众号 | 本轮未测：缺少可用的真实分享链接（抖音图集、小红书 xsec_token、微博 status id 均有有效期） |
-| 快手 | 旧报告为 `antispam need captcha`；本轮表现为"验证页/无可下载媒体"，未拿到视频 |
-| Instagram | 主机不可达（旧报告同因）；本轮 26s 内未出结果，需更长超时或独立网络环境再测 |
-| 微信视频号 | 需 root / 登录态，未验证 |
-| 趣头条 | 无可用网页作品页，未验证 |
+| 抖音 | 一条视频 + 一条图集分享链接（可同时验证 `douyin.webpage` 与 `douyin.webview.js`） |
+| 小红书 | 带 `xsec_token` 的 `explore` 链接 |
+| 微博 | `m.weibo.cn/status/...` 或桌面 status 链接 |
+| 微视 / 皮皮虾 | 当前有效的分享链接（目前由 `sniffer.webview` 覆盖，未写独立直解通道） |
+| 公众号 | 一篇含视频的文章链接（`wechat.mp` 已实现，缺真实固件与真机链接） |
 
-## 复用方式
+拿到链接后只需把它们填进 `tools/device-matrix.ps1` 的 `$cases` 并重跑：
 
-```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.yohu.urldown/.MainActivity -e url "https://www.bilibili.com/video/BV1HU4y1K7TT"
-sleep 15
-adb shell uiautomator dump /sdcard/ui.xml && adb shell cat /sdcard/ui.xml
+```powershell
+pwsh -File tools/device-matrix.ps1
 ```
-## 下载链路验证（本轮新增）
 
-| 项 | 结果 |
-| --- | --- |
-| 输入 | 今日头条 `i7035542323689685535` |
-| 动作 | 解析成功后点「下载到应用目录」 |
-| 落盘目录 | `/storage/emulated/0/Android/data/com.yohu.urldown/files/downloads` |
-| 文件名 | `"直接当场就社会性死亡了！".mp4`（标题清洗生效：中文与引号保留、非法字符替换） |
-| 大小 | 26,215,444 B |
-| 容器校验 | `MP4` ✅（按文件头字节判定，不是看状态码） |
+## 5. 与旧报告的口径差异（如实）
 
-### 本轮修掉的一个真实缺陷
+旧报告：8 通过 / 2 未通过 / 2 未验证。
+本轮：2 通过 / 3 失败 / 6 未验证。
 
-点下载后**应用进程直接消失**：`AssetDownloader.init(...)` 从未被调用，
-`YoDownload.enqueue` 在未初始化状态下失败，异常又发生在后台线程 → 进程被打死。
+差异**不是**"新实现变差了"，而是：
 
-修复：
-1. `MainActivity.onCreate` 中初始化下载引擎；
-2. 下载流程整体 try/catch，任何异常都变成界面上的「下载异常: …」而不是杀进程。
+1. 本轮只测了有链接的 5 个条目，其余 6 个平台缺链接无法测；
+2. 快手、Instagram 的失败原因与旧报告一致（验证码/网络），只是措辞更具体；
+3. 视频号现在有独立通道并给出明确原因（旧报告为"未验证，需 root/登录"）。
 
-修复后重测：下载完成、容器校验通过。
+要达到旧报告口径的 8 通过，必须先补齐第 4 节的链接——这是输入缺口，不是代码缺口。
