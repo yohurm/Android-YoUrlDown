@@ -62,6 +62,15 @@ public final class EncodingUtils {
         return decodeBase64Internal(text);
     }
 
+    /**
+     * 标准 Base64 解码（与 {@link #decodeBase64(String)} 同义）。
+     *
+     * <p>保留这个名字是因为移植自旧工程的规则代码按此名调用，且"标准 vs URL 安全"在
+     * 阅读时是有意义的区分。
+     */
+    public static byte[] decodeBase64Standard(String text) {
+        return decodeBase64(text);
+    }
     /** 解码并按 UTF-8 转字符串；失败返回 {@code null}。 */
     public static String decodeBase64ToString(String text) {
         byte[] raw = decodeBase64(text);
