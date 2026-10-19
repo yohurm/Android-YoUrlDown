@@ -39,6 +39,6 @@
 | B2 `fetch`（java.net 实现：手动跟随重定向 / Cookie / gzip / 超时分类）+ `sniff` 判据层 | ✅ 完成（8 文件移植 + HTTP 重写，54 单测绿） |
 | B3 `rules` 规则层（11 组，纯函数/零 IO/零 Android） | ✅ 完成（迁移 2,848 行；71 单测绿，含 2 份真实抓取固件） |
 | B4/B5 12 个 provider | 🚧 8/12：+ `instagram.embed`（用真机固件证明解析逻辑可通；网络不可达单独归类） |
-| B6 `transfer`（M3U8 / 命名 / 校验） | ⬜ 待做（单 URL 下载已由 `lib_download` 覆盖） |
+| B6 `transfer` | ✅ 完成：M3U8（含 AES-128/IV/字节范围/主列表）+ HTTP 下载器 + 命名白名单 + 容器探测 |
 | B7 `app` 适配器 + UI 接入 | ⬜ 待做 |
 | B8 真机 12 平台复验 | ⬜ 待做 |

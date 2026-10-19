@@ -11,6 +11,11 @@ public final class CancelToken {
     private volatile boolean cancelled;
 
     /** 未取消的令牌。 */
+    /** 永远不会被取消的令牌（别名，便于移植代码沿用旧名）。 */
+    public static CancelToken none() {
+        return fresh();
+    }
+
     public static CancelToken fresh() {
         return new CancelToken();
     }
