@@ -43,6 +43,8 @@ android {
 
 dependencies {
     implementation project(':lib_urlparse')
+    // 下载引擎：合入自 GGEC-Android-EarBuds/lib_common 的下载子系统（见 docs/design/05）
+    implementation project(':lib_download')
 
     implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation 'androidx.activity:activity:1.13.0'

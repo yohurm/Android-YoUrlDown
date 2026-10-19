@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.yohu.lib_download'
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
+
+    defaultConfig {
+        minSdk 24
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+dependencies {
+    // 只用注解；下载实现在 java.net.HttpURLConnection + 系统 Notification/SQLite 之上，
+    // 不引入 OkHttp / Okio 等网络库（与 lib_urlparse 的"零运行时依赖"口径一致）。
+    implementation 'androidx.annotation:annotation:1.9.1'
+    // 下载进度通知用 NotificationCompat（原 lib_common 同款依赖）
+    implementation 'androidx.core:core:1.18.0'
+
+    testImplementation 'junit:junit:4.13.2'
+}

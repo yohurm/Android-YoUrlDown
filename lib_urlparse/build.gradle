@@ -46,3 +46,122 @@ tasks.withType(Test).configureEach {
         name != 'android.jar' && !name.startsWith('mockable-android')
     }
 }
+
+// ============================================================================
+// 架构边界校验：把设计约束变成"构建失败条件"，而不是文档里的自觉约定。
+//
+// 这些任务的判定文本都很朴素（逐行 token 匹配），刻意不做语法分析：
+// 它们要防的是"顺手 import 了一个不该用的包"，这种问题用朴素规则就能挡住，
+// 而且误报时一眼能看懂为什么报错。
+// ============================================================================
+
+def mainJava = fileTree(projectDir) {
+    include 'src/main/java/**/*.java'
+}
+
+/** 收集 offenders 的通用工具：每一行命中 forbidden 中的任一 token 即记一条。 */
+def scanForbidden = { FileCollection files, List<String> forbidden, String what ->
+    def offenders = []
+    files.each { File file ->
+        def rel = project.relativePath(file).replace('\\', '/')
+        file.eachLine { line, index ->
+            forbidden.each { token ->
+                if (line.contains(token)) {
+                    offenders << "${rel}:${index + 1}: ${line.trim()}"
+                }
+            }
+        }
+    }
+    if (!offenders.isEmpty()) {
+        throw new GradleException("${what}:\n" + offenders.join('\n'))
+    }
+    offenders
+}
+
+// 1) 核心不得依赖 Android 框架（WebView / Media* / Context / Looper）。
+tasks.register('checkNoAndroidFrameworkImports') {
+    group = 'verification'
+    description = 'Fail if lib_urlparse core imports Android framework APIs.'
+    doLast {
+        scanForbidden(mainJava, [
+                'android.webkit.',
+                'android.media.',
+                'android.content.Context',
+                'android.content.Intent',
+                'android.app.',
+                'android.os.Looper',
+                'android.os.Handler'
+        ], 'lib_urlparse must not depend on Android framework APIs')
+    }
+}
+
+// 2) 层次边界：契约层不得依赖实现层；规则层必须是纯函数（无 IO、无 Android）。
+tasks.register('checkLayerBoundary') {
+    group = 'verification'
+    description = 'Fail if layers depend in the forbidden direction.'
+    doLast {
+        def implPackages = ['provider.', 'transfer.', 'fetch.', 'sniff.', 'rules.']
+        def contractFiles = fileTree(projectDir) {
+            include 'src/main/java/com/yohu/lib_urlparse/api/**/*.java'
+            include 'src/main/java/com/yohu/lib_urlparse/spi/**/*.java'
+        }
+        def contractOffenders = []
+        contractFiles.each { File file ->
+            def rel = project.relativePath(file).replace('\\', '/')
+            file.eachLine { line, index ->
+                if (line.trim().startsWith('import com.yohu.lib_urlparse.')) {
+                    implPackages.each { pkg ->
+                        if (line.contains('com.yohu.lib_urlparse.' + pkg)) {
+                            contractOffenders << "${rel}:${index + 1}: ${line.trim()}"
+                        }
+                    }
+                }
+            }
+        }
+        if (!contractOffenders.isEmpty()) {
+            throw new GradleException('api/spi must not import implementation packages:\n'
+                    + contractOffenders.join('\n'))
+        }
+
+        def ruleFiles = fileTree(projectDir) { include 'src/main/java/com/yohu/lib_urlparse/rules/**/*.java' }
+        def ruleForbidden = ['import java.io.', 'import java.nio.', 'import java.net.',
+                             'import android.', 'import com.yohu.lib_urlparse.fetch.',
+                             'import com.yohu.lib_urlparse.transfer.']
+        scanForbidden(ruleFiles, ruleForbidden,
+                'rules must stay pure (no IO, no Android, no fetch/transfer)')
+    }
+}
+
+// 3) 禁止内置任何第三方服务的密钥/会话字面量。
+tasks.register('checkNoSecrets') {
+    group = 'verification'
+    description = 'Fail if a secret-looking literal appears in sources.'
+    doLast {
+        // 只在"冒号/等号后面紧跟一个带引号的字面量"时报错。
+        // 早期版本没要求引号，结果 `this.cancelToken = b.cancelToken;` 这种正常代码被误判成密钥。
+        def patterns = [
+                ~/(?i)(api[_-]?key|secret|password|passwd)\s*[=:]\s*["'][^"']{8,}["']/,
+                ~/(?i)(sessionid|session_id|token|cookie)\s*[=:]\s*["'][A-Za-z0-9._\-]{12,}["']/,
+                /BEGIN [A-Z ]*PRIVATE KEY/
+        ]
+        def offenders = []
+        mainJava.each { File file ->
+            def rel = project.relativePath(file).replace('\\', '/')
+            file.eachLine { line, index ->
+                patterns.each { p ->
+                    if (line =~ p) {
+                        offenders << "${rel}:${index + 1}: ${line.trim()}"
+                    }
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException('secret-like literal found (do not embed credentials):\n'
+                    + offenders.join('\n'))
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn 'checkNoAndroidFrameworkImports', 'checkLayerBoundary', 'checkNoSecrets'
+}
