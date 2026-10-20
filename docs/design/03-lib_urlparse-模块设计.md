@@ -21,7 +21,6 @@ com.yohu.lib_urlparse
 │   ├── HttpClient               HTTP 抽象
 │   ├── JsEvaluator              JS 求值（Android 侧实现）
 │   ├── PageSniffer              页面媒体嗅探（Android 侧实现）
-│   ├── MediaMuxer               DASH 合并（Android 侧实现）
 │   ├── CredentialProvider       调用方凭据
 │   ├── EngineLogger             日志
 │   └── SniffOptions / SniffResult
@@ -34,23 +33,13 @@ com.yohu.lib_urlparse
 │   ├── DefaultHttpClient       java.net 实现（不引 OkHttp）
 │   ├── CookieJar               会话 cookie
 │   └── HttpHeaders             公共请求头策略
-├── sniff/                      媒体识别判据（纯逻辑 + 轻 IO）
+├── sniff/                      媒体识别判据（纯逻辑）
 │   ├── MediaExtensions         扩展名白名单
-│   ├── ContentTypeProbe        HEAD + Range 探测
-│   ├── MediaUrlSniffer         黑名单/UA/错误码判定
-│   ├── BlockPageDetector       拦截页识别（防假通过）
-│   ├── GalleryImagePolicy      图集策略
-│   └── PageUserAgents          按域名选 UA
+│   └── BlockPageDetector       拦截页识别（防假通过）
 ├── rules/                      平台规则（纯函数，零 IO、零 Android）
 │   └── <platform>/             每平台一组：host 判定、ID 抽取、结构化变量解析
 ├── provider/                   [internal] 通道实现
 │   └── <platform>/             每平台一个或多个 provider
-├── transfer/                   下载
-│   ├── HttpDownloader          直链下载（断点、限速、取消）
-│   ├── M3u8Downloader          播放列表（含 AES-128）
-│   ├── BatchDownloader         批量 + 去重 + 部分失败语义
-│   ├── FileNames               命名与真实扩展名
-│   └── MediaProbe              容器签名探测
 └── util/                       编码、URL、文本、JSON 小工具
 ```
 
@@ -65,7 +54,7 @@ com.yohu.lib_urlparse
 | --- | --- | --- |
 | `api.*` | ✅ | 全部公开，且必须有 javadoc |
 | `spi.*` | ✅ | 扩展点，第三方可实现 |
-| `core.*` / `provider.*` / `fetch.*` / `transfer.*` / `util.*` | ❌ | `@RestrictTo` |
+| `core.*` / `provider.*` / `fetch.*` / `util.*` | ❌ | `@RestrictTo` |
 | `sniff.*` | ❌ | 判据是内部策略；如需暴露，另开 `spi` |
 
 > 现状把 12 个 provider 与 7 个 sniffer 判据全部公开，导致"哪些能改、哪些不能动"没有边界。新设计收紧。
@@ -84,19 +73,18 @@ com.yohu.lib_urlparse
 ## 4. 线程与并发约定
 
 - 引擎所有方法：**同步、在当前线程完成**，不创建线程池。
-- 下载器：允许内部并发，但并发度由 `BatchDownloader.Builder.maxConcurrency(int)` 显式指定，默认 1。
+- 库不下载：下载、合并、落盘与并发都在 `app`（见 02 §9、07）。
 - `JsEvaluator` / `PageSniffer`：**线程亲和**。契约要求"创建与调用必须在同一 Looper 线程"；
   `ParseContext` 注入时做一次身份校验（记录创建线程，跨线程调用抛 `IllegalStateException`）。
-- 取消：`CancelToken` 由调用方创建并贯穿；取消是协作式的，每个下载循环检查一次。
+- 取消：`CancelToken` 由调用方创建并贯穿；取消是协作式的，每次网络请求 / JS 求值前检查一次。
 
 ## 5. 测试策略（G1 的落地方式）
 
 | 层次 | 测试方式 | 目标 |
 | --- | --- | --- |
 | `rules/*` | 纯 JVM 单测 + 真实抓取固件（HTML/JSON 样本） | 覆盖每个平台的字符串解析分支 |
-| `sniff/*` | 纯 JVM 单测（`ContentTypeProbe` 用 `mockwebserver`） | 覆盖判据与拦截页识别 |
+| `sniff/*` | 纯 JVM 单测 | 覆盖扩展名判据与拦截页识别 |
 | `fetch/*` | `mockwebserver` | 覆盖重定向、cookie、超时、错误码 |
-| `transfer/*` | 本地 HTTP 服务 + 临时目录 | 覆盖命名、去重、取消、部分失败 |
 | `provider/*` | 纯 JVM 单测（provider 只依赖 `spi`，可注入假 HTTP/假求值器） | **这是新设计带来的关键收益**：provider 不再需要 WebView 才能测 |
 | `core/*` | 纯 JVM 单测（注册表排序、调度、trace 记录、兜底） | 调度语义可测 |
 | Android 适配器 | `app` 的 instrumented 测试 | WebView 求值、DASH 合并、落盘 |
@@ -112,14 +100,12 @@ com.yohu.lib_urlparse
 // 1) 提供 Android 侧适配器
 JsEvaluator    jsEval    = new WebViewJsEvaluator(context);
 PageSniffer    sniffer   = new WebViewPageSniffer(context);
-MediaMuxer     muxer     = new MediaMuxerAdapter();
 
 // 2) 装配（唯一入口，保证各入口配置一致）
 UrlParseEngine engine = UrlParseEngine.builder()
         .httpClientFactory(DefaultHttpClient::new)
         .service(JsEvaluator.class, jsEval)
         .service(PageSniffer.class, sniffer)
-        .service(MediaMuxer.class, muxer)
         .credentialProvider(appCredentials)     // 默认"未配置"
         .logger(appLogger)
         .build();
@@ -128,20 +114,21 @@ UrlParseEngine engine = UrlParseEngine.builder()
 UrlParseResult r = engine.parse(UrlParseRequest.builder(shareText).build());
 ```
 
-`app` **不得**：解析 HTML/JSON、判断媒体扩展名、拼下载 URL、决定文件命名。这些都在库里。
+`app` **不得**：解析 HTML/JSON、拼下载 URL。这些都在库里。
+下载相关的判断（命名、扩展名白名单、容器校验）属于下载子系统，在 `app/download/`。
 
 ## 7. 迁移映射（旧 → 新，仅结构对照）
 
 | 旧（`com.dlparse.engine`） | 新（`com.yohu.lib_urlparse`） | 处理 |
 | --- | --- | --- |
 | `ParseEngine` / `EngineConfig` / `ParseRequest` | `api.UrlParseEngine` / `api.*` | 重命名 + 收紧公开面 |
-| `spi.*` | `spi.*` | 基本沿用，补 `MediaMuxer` / `CredentialProvider` |
+| `spi.*` | `spi.*` | 基本沿用，补 `CredentialProvider` |
 | `model.ParseResult` / `MediaItem` | `api.UrlParseResult` / `api.MediaAsset` | 改名，字段语义保留 |
 | `rules.*`（11 个） | `rules.<platform>.*` | 按平台归组；纯函数化 |
 | `provider.*`（12 个） | `provider.<platform>.*` | 保持实现，改依赖为 `spi`+`fetch` |
 | `sniffer.*` | `sniff.*` | 判据集中，其它模块只调用 |
 | `http.*` | `fetch.*` | 保留 `java.net` 实现 |
-| `download.*` | `transfer.*` | 拆分；`DashMuxer` 移到 `app` |
+| `download.*` | `app/download/*` | 下载整体移出解析库：直链走 `lib_download`，M3U8 / DASH 合并 / 命名 / 容器校验在 `app` |
 | `util.MediaVerifier` | `app` | 依赖系统框架，外置 |
 | `js.WebView*` | `app` 适配器 | 外置，实现 `spi` |
 | `js.RhinoJsEvaluator` | `spi` 的实现之一（可选） | 若保留则需引入 Rhino 依赖，需决策 |
