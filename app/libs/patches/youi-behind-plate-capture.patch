@@ -1,0 +1,221 @@
+From 94a30da140a215403ceb51fcd2546fdae753890e Mon Sep 17 00:00:00 2001
+From: yohurm <yohurm@gmail.com>
+Date: Tue, 20 Oct 2026 10:31:52 +0000
+Subject: [PATCH] fix(backdrop): paint only what sits behind an in-tree plate
+
+BehindPlateCapture drew every visible sibling of the plate's ancestors,
+including the ones drawn after the plate's branch. Under a floating glass
+YoTabs bar that pulled the bar into a segment plate's capture while the
+bar's own capture held the plate, so the two RenderNodes referenced each
+other and the first hardware frame after switching to a page with a
+YoSegmentButton recursed in the render thread (SIGSEGV).
+
+Stop after the branch that contains the plate; later siblings are in
+front of it. Adds a pixel test and a YoTabs switch test that runs the
+hardware glass pipeline.
+---
+ .../backdrop/BehindPlateCapture.java          |  13 +-
+ .../backdrop/BehindPlateCaptureTest.java      |  33 ++++++
+ .../navigation/tabs/TabsSwitchRenderTest.java | 112 ++++++++++++++++++
+ 3 files changed, 156 insertions(+), 2 deletions(-)
+ create mode 100644 youi_kit/src/test/java/com/yohu/youi/widget/navigation/tabs/TabsSwitchRenderTest.java
+
+diff --git a/youi_kit/src/main/java/com/yohu/youi/widget/background/backdrop/BehindPlateCapture.java b/youi_kit/src/main/java/com/yohu/youi/widget/background/backdrop/BehindPlateCapture.java
+index f4c40e91..c1cbebf9 100644
+--- a/youi_kit/src/main/java/com/yohu/youi/widget/background/backdrop/BehindPlateCapture.java
++++ b/youi_kit/src/main/java/com/yohu/youi/widget/background/backdrop/BehindPlateCapture.java
+@@ -10,7 +10,8 @@ import androidx.annotation.NonNull;
+ 
+ /**
+  * Paints what sits behind an in-tree plate into the caller's canvas.
+- * Ancestors that contain the plate contribute only their background.
++ * Ancestors that contain the plate contribute only their background; their children drawn after
++ * the plate's branch sit in front of it and are not painted.
+  * Their {@code draw()} is never called, so the on-screen display list stays intact.
+  */
+ final class BehindPlateCapture {
+@@ -43,12 +44,20 @@ final class BehindPlateCapture {
+             }
+             int childSave = canvas.save();
+             canvas.translate(child.getLeft() - scrollX, child.getTop() - scrollY);
+-            if (OverlayExclusion.containedBy(child, plate)) {
++            boolean branch = OverlayExclusion.containedBy(child, plate);
++            if (branch) {
+                 paintNode(canvas, child, plate);
+             } else {
+                 child.draw(canvas);
+             }
+             canvas.restoreToCount(childSave);
++            if (branch) {
++                // Siblings after the plate's branch draw in front of it, so they are not behind
++                // the plate. Painting them would also pull in front-most glass (a floating tab
++                // bar) whose own capture holds this plate: the two RenderNodes would reference
++                // each other and the render thread recurses until it crashes.
++                break;
++            }
+         }
+         canvas.restoreToCount(checkpoint);
+     }
+diff --git a/youi_kit/src/test/java/com/yohu/youi/widget/background/backdrop/BehindPlateCaptureTest.java b/youi_kit/src/test/java/com/yohu/youi/widget/background/backdrop/BehindPlateCaptureTest.java
+index 35820cce..15c50292 100644
+--- a/youi_kit/src/test/java/com/yohu/youi/widget/background/backdrop/BehindPlateCaptureTest.java
++++ b/youi_kit/src/test/java/com/yohu/youi/widget/background/backdrop/BehindPlateCaptureTest.java
+@@ -50,4 +50,37 @@ public class BehindPlateCaptureTest {
+         assertEquals(0xFFFF5C7A, bitmap.getPixel(10, 10));
+         assertEquals(0xFF2244AA, bitmap.getPixel(10, 60));
+     }
++    /**
++     * A sibling drawn after the plate's branch (a floating tab bar over the page) is in front of
++     * the plate. Painting it would let that bar's glass, which samples the page holding this plate,
++     * enter this plate's capture: the two RenderNodes would reference each other.
++     */
++    @Test
++    public void paintOmitsSiblingsInFrontOfThePlate() {
++        FrameLayout scene = new FrameLayout(RuntimeEnvironment.getApplication());
++        scene.setBackgroundColor(0xFF2244AA);
++        FrameLayout page = new FrameLayout(scene.getContext());
++        View plate = new View(page.getContext());
++        plate.setBackgroundColor(Color.WHITE);
++        page.addView(plate, new FrameLayout.LayoutParams(60, 30));
++        scene.addView(page, new FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.MATCH_PARENT,
++                FrameLayout.LayoutParams.MATCH_PARENT));
++        View bar = new View(scene.getContext());
++        bar.setBackgroundColor(0xFFFF5C7A);
++        scene.addView(bar, new FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.MATCH_PARENT,
++                FrameLayout.LayoutParams.MATCH_PARENT));
++
++        int width = View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY);
++        int height = View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY);
++        scene.measure(width, height);
++        scene.layout(0, 0, 200, 80);
++
++        Bitmap bitmap = Bitmap.createBitmap(200, 80, Bitmap.Config.ARGB_8888);
++        BehindPlateCapture.paint(new Canvas(bitmap), scene, plate);
++
++        assertEquals(0xFF2244AA, bitmap.getPixel(100, 60));
++        assertEquals(0xFF2244AA, bitmap.getPixel(10, 10));
++    }
+ }
+diff --git a/youi_kit/src/test/java/com/yohu/youi/widget/navigation/tabs/TabsSwitchRenderTest.java b/youi_kit/src/test/java/com/yohu/youi/widget/navigation/tabs/TabsSwitchRenderTest.java
+new file mode 100644
+index 00000000..37d0a484
+--- /dev/null
++++ b/youi_kit/src/test/java/com/yohu/youi/widget/navigation/tabs/TabsSwitchRenderTest.java
+@@ -0,0 +1,112 @@
++package com.yohu.youi.widget.navigation.tabs;
++
++import android.app.Activity;
++import android.graphics.Bitmap;
++import android.os.Handler;
++import android.os.Looper;
++import android.view.PixelCopy;
++import android.view.View;
++import android.widget.LinearLayout;
++import android.widget.ScrollView;
++import android.widget.TextView;
++
++import com.yohu.youi.api.navigation.YoTabs;
++
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.Robolectric;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.android.controller.ActivityController;
++import org.robolectric.annotation.Config;
++import org.robolectric.annotation.GraphicsMode;
++import org.robolectric.shadows.ShadowBuild;
++import org.robolectric.shadows.ShadowLooper;
++
++import java.util.concurrent.TimeUnit;
++
++/**
++ * Regression: a page holding an in-tree CONTROL plate (a segment) under a floating glass tab bar.
++ * The plate's behind-capture used to paint the bar in front of it while the bar's capture held the
++ * plate, so the first hardware frame after switching to that page recursed in the render thread
++ * and the process died with SIGSEGV.
++ */
++@RunWith(RobolectricTestRunner.class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@Config(sdk = 35, qualifiers = "w393dp-h852dp-xxhdpi")
++public class TabsSwitchRenderTest {
++
++    @Before
++    public void setUp() {
++        // GlassCapability turns the hardware glass pipeline off under a Robolectric fingerprint;
++        // the crash only exists on that pipeline, so pose as a device.
++        ShadowBuild.setFingerprint("google/oriole/oriole:15/AP3A/1:user/release-keys");
++    }
++
++    @Test
++    public void switchPagesWithHardwareFrames() {
++        ActivityController<Activity> c = Robolectric.buildActivity(Activity.class).setup();
++        Activity a = c.get();
++        YoTabs.Builder b = YoTabs.create(a)
++                .setBarStyle(YoTabs.BarStyle.FLOATING)
++                .setBarOverlap(true)
++                .setHidePolicy(YoTabs.HidePolicy.FOLLOW_SCROLL);
++        for (int id = 1; id <= 3; id++) {
++            b.addTab(id, "T" + id, android.R.drawable.ic_menu_view, android.R.drawable.ic_menu_view,
++                    page(a, id));
++        }
++        YoTabs tabs = b.setSelectedId(1).build();
++        a.setContentView(tabs.getView());
++        idle(100);
++        for (int i = 0; i < 9; i++) {
++            int id = 1 + (i % 3);
++            tabs.setSelectedId(id);
++            for (int f = 0; f < 3; f++) {
++                idle(16);
++                frame(a);
++            }
++        }
++        tabs.destroy();
++        c.pause().stop().destroy();
++    }
++
++    private static View page(Activity a, int id) {
++        ScrollView scroll = new ScrollView(a);
++        LinearLayout column = new LinearLayout(a);
++        column.setOrientation(LinearLayout.VERTICAL);
++        if (id != 1) {
++            com.yohu.youi.api.controls.YoSegmentButton seg =
++                    com.yohu.youi.api.controls.YoSegmentButton.create(a)
++                            .setType(com.yohu.youi.api.controls.YoSegmentButton.SegmentType.TABS)
++                            .setSize(com.yohu.youi.api.controls.YoSegmentButton.Size.MEDIUM)
++                            .addSegment(1, "全部")
++                            .addSegment(2, "进行中")
++                            .addSegment(3, "已完成")
++                            .build();
++            column.addView(seg.getView());
++        }
++        for (int i = 0; i < 40; i++) {
++            TextView t = new TextView(a);
++            t.setText("page " + id + " row " + i);
++            t.setPadding(40, 40, 40, 40);
++            column.addView(t);
++        }
++        scroll.addView(column);
++        return scroll;
++    }
++
++    private static void frame(Activity a) {
++        View decor = a.getWindow().getDecorView();
++        Bitmap bmp = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
++        PixelCopy.request(a.getWindow(), bmp, r -> { }, new Handler(Looper.getMainLooper()));
++        idle(0);
++    }
++
++    private static void idle(long ms) {
++        ShadowLooper.idleMainLooper();
++        if (ms > 0) {
++            ShadowLooper.idleMainLooper(ms, TimeUnit.MILLISECONDS);
++        }
++        ShadowLooper.idleMainLooper();
++    }
++}
+-- 
+2.49.0
+

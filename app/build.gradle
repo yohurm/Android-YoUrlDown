@@ -53,7 +53,7 @@ dependencies {
     // 设计系统：YoUI Kit（源码仓库 yohurm/Android-YoUI，youi_kit 模块产物）。
     // 只允许引用 com.yohu.youi.api.*（见下方 verifyYouiApiBoundary）。
     // AAR 自身依赖 appcompat / core / recyclerview，下方已声明，版本与 Kit 构建时一致。
-    implementation files('libs/youi_kit-1.0.0-2fad9492.aar')
+    implementation files('libs/youi_kit-1.0.0-94a30da1.aar')
 
     implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation 'androidx.activity:activity:1.13.0'
