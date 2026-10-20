@@ -68,7 +68,7 @@ $env:JAVA_HOME = "D:\Dev\Env\Java\jdk-21"
 - `lib_urlparse` 三个架构边界校验任务挂在 `check` 上，越界直接构建失败。
 - 下载子系统在 `app`：`task/DownloadRunner` 调度，`download/DownloadPipeline` 处理直链（`lib_download`）/ M3U8 / 音视频合并 / 校验。
 - 解析通道与真机验证进度以 [docs/verification](docs/verification/) 为准。
-- app 界面：底部三页签（YoTabs 悬浮胶囊，随滚动隐藏）。主页是居中的统一输入框，粘贴链接或整段分享文字即可识别并解析；
+- app 界面：底部三页签（YoTabs 悬浮胶囊，随滚动隐藏）。主页是居中的统一搜索栏（YoSearch，内嵌“解析”按钮），粘贴链接或整段分享文字即可识别并解析；
   其他 App 的分享面板里选“解析并下载”也能直接进来。同一链接重复下载会先提醒。
   任务页是卡片列表（缩略图兼平台标识 / 标题 + 进度 + 状态 / 一个主操作），按「全部 / 进行中 / 已结束」筛选，
   卡片上暂停 / 继续 / 重试 / 打开，长按取消 / 分享 / 删除，页菜单全部暂停 / 全部继续。
