@@ -5,8 +5,14 @@
          不在初始化阶段预先声明用不到的权限。 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 下载进度通知（lib_download 要求宿主声明）。Android 13+ 首次下载时询问一次，拒绝也照常下载。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 下载在前台服务里跑，切到后台或锁屏也不会被系统停掉。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
+        android:name=".UrlDownApp"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@drawable/ic_launcher"
@@ -16,12 +22,36 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 在抖音 / 小红书等应用里“分享 → YoUrlDown”，分享文字直接进主页解析。 -->
+            <intent-filter android:label="@string/share_target_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+
+        <!-- 有任务在下载时保持前台，通知栏显示总进度；全部结束即停止。 -->
+        <service
+            android:name=".task.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 把下载好的文件以 content:// 交给播放器 / 相册 / 分享目标。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

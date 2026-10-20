@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- HarmonyOS Symbol house_fill -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M9.56,2.53C11.01,1.29,13.18,1.33,14.58,2.66L22.2,9.91C22.74,10.42,22.8,11.2,22.29,11.74C21.78,12.28,21,12.34,20.46,11.83L19.5,10.92V19.25C19.5,20.8,18.24,22.06,16.69,22.06H7.31C5.76,22.06,4.5,20.8,4.5,19.25V10.92L3.54,11.83C3,12.34,2.22,12.28,1.71,11.74C1.2,11.2,1.26,10.42,1.8,9.91L9.41,2.66L9.56,2.53ZM9.75,20.56H14.25V16.25C14.25,15.01,13.24,14,12,14C10.76,14,9.75,15.01,9.75,16.25V20.56Z" />
+</vector>

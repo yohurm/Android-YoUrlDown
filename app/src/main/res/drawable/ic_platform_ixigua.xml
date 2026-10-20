@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 平台标识：ixigua。白色图形来自 Noto Sans SC Bold「西」，由 tools/icons/gen_platform_icons.py 生成。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FE5C2B" android:pathData="M6,0h12a6,6 0,0 1,6 6v12a6,6 0,0 1,-6 6h-12a6,6 0,0 1,-6 -6v-12a6,6 0,0 1,6 -6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M5.5 5.63V7.31H9.65V8.87H6.24V18.37H7.91V17.55H16.23V18.34H17.99V8.87H14.38V7.31H18.5V5.63ZM7.91 15.94V13.79C8.15 14.05 8.38 14.35 8.49 14.54C10.55 13.6 11.1 11.99 11.18 10.47H12.73V12.01C12.73 13.67 13.05 14.15 14.57 14.15C14.87 14.15 15.82 14.15 16.14 14.15H16.23V15.94ZM7.91 13.09V10.47H9.64C9.56 11.44 9.23 12.38 7.91 13.09ZM11.2 8.87V7.31H12.73V8.87ZM14.38 10.47H16.23V12.51C16.17 12.53 16.1 12.54 15.97 12.54C15.77 12.54 14.99 12.54 14.83 12.54C14.42 12.54 14.38 12.48 14.38 12.01Z" />
+</vector>

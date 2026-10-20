@@ -65,9 +65,9 @@ foreach ($c in $cases) {
     for ($i = 0; $i -lt 12; $i++) {
         Start-Sleep -Seconds 3
         $xml = Dump-Ui
-        if ($xml -match 'text="(平台:|解析失败)') { break }
+        if ($xml -match '(text|content-desc)="(平台:|解析失败)') { break }
     }
-    $ok = [regex]::Match($xml, 'text="(平台:[^"]{10,})"')
+    $ok = [regex]::Match($xml, '(?:text|content-desc)="(平台:[^"]{10,})"')
     if ($ok.Success) {
         $text = Unescape $ok.Groups[1].Value
         $lines = $text -split "`n"
@@ -78,7 +78,7 @@ foreach ($c in $cases) {
         Write-Host "[$platform] 通过 通道=$channel 媒体=$media"
         continue
     }
-    $fail = [regex]::Match($xml, 'text="(解析失败[^"]{10,2000})"')
+    $fail = [regex]::Match($xml, '(?:text|content-desc)="(解析失败[^"]{10,2000})"')
     if ($fail.Success) {
         $text = Unescape $fail.Groups[1].Value
         $reason = ([regex]::Match($text, "原因:\s*(\w+)")).Groups[1].Value

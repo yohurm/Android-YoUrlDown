@@ -39,27 +39,66 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    testOptions {
+        // 截图测试（UiScreenshotTest）要读真实资源。
+        unitTests.includeAndroidResources = true
+    }
 }
 
 dependencies {
     implementation project(':lib_urlparse')
     // 下载引擎：合入自 GGEC-Android-EarBuds/lib_common 的下载子系统（见 docs/design/05）
     implementation project(':lib_download')
+    // 设计系统：YoUI Kit（源码仓库 yohurm/Android-YoUI，youi_kit 模块产物）。
+    // 只允许引用 com.yohu.youi.api.*（见下方 verifyYouiApiBoundary）。
+    // AAR 自身依赖 appcompat / core / recyclerview，下方已声明，版本与 Kit 构建时一致。
+    implementation files('libs/youi_kit-1.0.0-2fad9492.aar')
 
     implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation 'androidx.activity:activity:1.13.0'
     implementation 'androidx.core:core:1.18.0'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel:2.9.4'
-    implementation 'androidx.lifecycle:lifecycle-livedata:2.9.4'
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
-    implementation 'com.google.android.material:material:1.14.0'
 
     testImplementation 'junit:junit:4.13.2'
+    // 本地渲染界面截图，没有真机也能检查布局（与 Android-YoUI 测试同版本）。
+    testImplementation 'org.robolectric:robolectric:4.16.1'
     // android.jar 里的 org.json 是抛异常的桩；JSON 编解码相关单测需要真实实现。
     testImplementation 'org.json:json:20240303'
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
 
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+}
+
+// 与 Android-YoUI 示例工程同一条边界：应用只能 import Kit 的公开 API 包，
+// 内部包被混淆、随版本变化，直接引用会在升级 AAR 时静默断掉。
+tasks.register('verifyYouiApiBoundary') {
+    group = 'verification'
+    description = 'App code may import only com.yohu.youi.api.* from YoUI Kit.'
+    def sourceRoots = [file('src/main/java'), file('src/test/java'), file('src/androidTest/java')]
+            .findAll { it.exists() }
+    inputs.files(sourceRoots)
+    doLast {
+        def violations = []
+        sourceRoots.each { root ->
+            fileTree(root) { include '**/*.java' }.each { source ->
+                source.getText('UTF-8').readLines().eachWithIndex { line, index ->
+                    def trimmed = line.trim()
+                    if (trimmed.startsWith('import com.yohu.youi.')
+                            && !trimmed.startsWith('import com.yohu.youi.api.')) {
+                        violations << "${source}:${index + 1}: ${trimmed}"
+                    }
+                }
+            }
+        }
+        if (!violations.isEmpty()) {
+            throw new GradleException('只允许引用 YoUI 公开 API：\n' + violations.join('\n'))
+        }
+    }
+}
+tasks.configureEach { task ->
+    if (task.name == 'preBuild') {
+        task.dependsOn('verifyYouiApiBoundary')
+    }
 }

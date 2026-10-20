@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 平台标识：pipixia。白色图形来自 Noto Sans SC Bold「皮」，由 tools/icons/gen_platform_icons.py 生成。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#F2A20C" android:pathData="M6,0h12a6,6 0,0 1,6 6v12a6,6 0,0 1,-6 6h-12a6,6 0,0 1,-6 -6v-12a6,6 0,0 1,6 -6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M7.02 7.26V10.65C7.02 12.62 6.89 15.38 5.5 17.28C5.86 17.47 6.57 18.04 6.84 18.35C8.04 16.75 8.47 14.41 8.62 12.4H9.49C10.07 13.67 10.78 14.75 11.68 15.64C10.59 16.19 9.34 16.59 7.97 16.85C8.29 17.19 8.75 17.95 8.92 18.38C10.42 18.04 11.82 17.52 13.05 16.76C14.25 17.56 15.68 18.12 17.43 18.46C17.67 17.99 18.13 17.28 18.5 16.9C16.96 16.67 15.64 16.26 14.54 15.67C15.77 14.59 16.71 13.18 17.3 11.39L16.2 10.82L15.9 10.87H13.32V8.85H15.96C15.79 9.35 15.62 9.83 15.44 10.2L16.97 10.61C17.38 9.82 17.84 8.62 18.17 7.51L16.89 7.21L16.6 7.26H13.32V5.54H11.62V7.26ZM11.23 12.4H15.07C14.59 13.33 13.93 14.1 13.13 14.73C12.33 14.08 11.71 13.31 11.23 12.4ZM11.62 8.85V10.87H8.67V10.65V8.85Z" />
+</vector>

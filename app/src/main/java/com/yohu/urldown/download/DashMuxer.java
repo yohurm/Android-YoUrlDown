@@ -1,7 +1,4 @@
-package com.yohu.urldown.adapter;
-
-import com.yohu.lib_urlparse.spi.CancelToken;
-import com.yohu.lib_urlparse.transfer.DownloadException;
+package com.yohu.urldown.download;
 
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
@@ -11,7 +8,7 @@ import android.media.MediaMuxer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * 把 DASH 的**分离音视频轨**合成一个可播放文件（MP4）。
@@ -22,8 +19,7 @@ import java.util.List;
  *
  * <p>为什么不用 ffmpeg：Android 自带 {@link MediaExtractor} + {@link MediaMuxer}
  * 就能做这件事（API 18+，本工程 minSdk 21）。少一个几 MB 的原生库、少一处 ABI 风险，
- * 也避免把"能不能播放"寄托在第三方二进制上。样本自己走的是另一条路
- * （APK 内捆绑 ijkplayer/ffmpeg），我们不必照抄。
+ * 也避免把"能不能播放"寄托在第三方二进制上。
  *
  * <p>合并策略：**按 PTS 交错写入**。不能先写完视频再写音频——那样虽然 muxer 也接受，
  * 但部分播放器会因长时间无音频样本而卡顿或拒绝播放。
@@ -69,10 +65,11 @@ public final class DashMuxer {
      * @param video 含视频轨的容器（DASH 的 {@code .m4s} 或普通 mp4）
      * @param audio 含音频轨的容器
      * @param out   输出文件；已存在会被覆盖
-     * @throws DownloadException 无法解析轨道或写入失败时抛出，{@link DownloadException.Reason#MUX_FAILED}
+     * @param canceled 返回 true 时中止（不留半个输出文件）
+     * @throws IOException 无法解析轨道、写入失败或被取消
      */
-    public static Result mux(File video, File audio, File out, CancelToken token)
-            throws DownloadException {
+    public static Result mux(File video, File audio, File out, BooleanSupplier canceled)
+            throws IOException {
         if (video == null || !video.isFile()) {
             throw muxError("视频轨文件不存在: " + video);
         }
@@ -127,9 +124,8 @@ public final class DashMuxer {
             long lastPtsUs = 0;
 
             while (!vDone || !aDone) {
-                if (token != null && token.isCancelled()) {
-                    throw new DownloadException(DownloadException.Reason.CANCELLED,
-                            "mux cancelled");
+                if (canceled.getAsBoolean()) {
+                    throw new IOException("合并已取消");
                 }
                 boolean writeVideo;
                 if (vDone) {
@@ -163,16 +159,11 @@ public final class DashMuxer {
             return new Result(outFile, vCount, aCount, lastPtsUs, vMime, aMime);
         } catch (IOException e) {
             discardPartial(outFile);
-            throw new DownloadException(DownloadException.Reason.MUX_FAILED,
-                    "合并失败(IO): " + e.getMessage(), e);
+            throw e;
         } catch (RuntimeException e) {
             // MediaMuxer/MediaExtractor 在格式不受支持时抛的是 RuntimeException（含 IllegalState）
             discardPartial(outFile);
-            throw new DownloadException(DownloadException.Reason.MUX_FAILED,
-                    "合并失败(" + e.getClass().getSimpleName() + "): " + e.getMessage(), e);
-        } catch (DownloadException e) {
-            discardPartial(outFile);
-            throw e;
+            throw new IOException("合并失败(" + e.getClass().getSimpleName() + "): " + e.getMessage(), e);
         } finally {
             if (muxer != null) {
                 if (started) {
@@ -193,60 +184,10 @@ public final class DashMuxer {
         }
     }
 
-    // ------------------------------------------------------------------ 策略
-
-    /**
-     * 判断这批下载结果是否属于"DASH 分离音视频、需要合并"的形态。
-     *
-     * <p>抽成纯函数是为了能在 JVM 上单测——真正的 mux 只能在设备上跑
-     * （{@link MediaMuxer} 在 android.jar 里是抛 {@code Stub!} 的空实现）。
-     *
-     * <p>判据刻意保守：**恰好一条视频轨 + 恰好一条音频轨**才合并。
-     * 若有多条视频（多 P、多清晰度）就不猜，交给调用方逐个处理——
-     * 猜错会把用户的多个视频揉成一个坏文件。
-     *
-     * @return 要合并时返回 {@code [videoIdx, audioIdx]}，否则 null
-     */
-    public static int[] decideMux(List<File> files, List<String> mimes) {
-        if (files == null || mimes == null || files.size() != mimes.size()) {
-            return null;
-        }
-        int v = -1;
-        int a = -1;
-        int vCount = 0;
-        int aCount = 0;
-        for (int i = 0; i < files.size(); i++) {
-            String m = mimes.get(i) == null ? "" : mimes.get(i).toLowerCase(java.util.Locale.ROOT);
-            if (m.startsWith("video/")) {
-                vCount++;
-                v = i;
-            } else if (m.startsWith("audio/")) {
-                aCount++;
-                a = i;
-            }
-        }
-        if (vCount == 1 && aCount == 1) {
-            return new int[]{v, a};
-        }
-        return null;
-    }
-
-    /** 合并输出名：把视频文件名的 {@code .m4s} 换成 {@code .mp4}。 */
-    public static String muxedName(String videoFileName) {
-        if (videoFileName == null) {
-            return "muxed.mp4";
-        }
-        int dot = videoFileName.lastIndexOf('.');
-        String base = dot > 0 ? videoFileName.substring(0, dot) : videoFileName;
-        // 去掉下载时加的"轨道序号"尾巴（_2 / _music_3），让成品名更像作品名
-        base = base.replaceAll("_(music_)?\\d+$", "");
-        return base + ".mp4";
-    }
-
     // ------------------------------------------------------------------ 内部
 
-    private static DownloadException muxError(String message) {
-        return new DownloadException(DownloadException.Reason.MUX_FAILED, message);
+    private static IOException muxError(String message) {
+        return new IOException(message);
     }
 
     /**
@@ -313,7 +254,11 @@ public final class DashMuxer {
         info.offset = 0;
         info.size = size;
         info.presentationTimeUs = ex.getSampleTime();
-        info.flags = ex.getSampleFlags();
+        // MediaExtractor 的 SAMPLE_FLAG_* 与 MediaCodec 的 BUFFER_FLAG_* 数值并不对应
+        // （ENCRYPTED=2 会被当成 CODEC_CONFIG，PARTIAL_FRAME=4 会被当成 END_OF_STREAM），
+        // 这里只映射关键帧。
+        info.flags = (ex.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0
+                ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
         ex.advance();
         return true;
     }

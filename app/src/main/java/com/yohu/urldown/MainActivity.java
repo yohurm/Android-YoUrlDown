@@ -1,194 +1,216 @@
 package com.yohu.urldown;
 
+import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Toast;
+import android.widget.FrameLayout;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
-import com.yohu.lib_urlparse.api.MediaAsset;
-import com.yohu.lib_urlparse.api.ParseFailure;
-import com.yohu.lib_urlparse.api.UrlParseRequest;
-import com.yohu.lib_urlparse.api.UrlParseResult;
-import com.yohu.urldown.databinding.ActivityMainBinding;
-import com.yohu.urldown.download.DownloadPipeline;
-
-import java.io.File;
-
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.yohu.urldown.settings.AppSettings;
+import com.yohu.urldown.ui.TabPage;
+import com.yohu.urldown.ui.home.HomePage;
+import com.yohu.urldown.ui.settings.SettingsPage;
+import com.yohu.urldown.ui.tasks.TasksPage;
+import com.yohu.youi.api.navigation.YoTabs;
+import com.yohu.youi.api.platform.YoSystemBar;
+import com.yohu.youi.api.theme.YoColors;
 
 /**
- * 首页：粘贴链接 → 解析 → 展示结果。
+ * 应用外壳：YoTabs 作为窗口根容器，挂主页 / 任务 / 设置三页。
  *
- * <p>解析在**后台线程**执行（网络与 WebView 等待都不能占主线程），结果回主线程渲染。
- * 失败时展示引擎给出的 reason 与人话提示，不伪造"解析成功"。
+ * <p>底栏用悬浮胶囊（FLOATING）：栏叠在内容上，内容一直铺到屏幕底，
+ * 各页按 {@link YoTabs.OnContentInsetListener} 给的高度在末尾留白，最后一项能滚到栏上方；
+ * 往下滚时胶囊跟手收起，往回滚再出现，长列表（任务页）多一屏可视区域。
+ *
+ * <p>外部带入链接的两种入口，都会切到主页并直接解析：
+ * <ul>
+ *   <li>其他应用“分享 → YoUrlDown”（{@code ACTION_SEND text/plain}，分享文字里夹着链接也行）；</li>
+ *   <li>真机自动化：{@code adb shell am start -n com.yohu.urldown/.MainActivity -e url "<链接>"}。</li>
+ * </ul>
  */
 public class MainActivity extends AppCompatActivity {
 
-    private ActivityMainBinding binding;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private volatile UrlParseResult lastResult;
+    private static final String STATE_TAB = "main.tab";
+    private static final String EXTRA_URL = "url";
+    /** 打开后切到哪一页（通知点进来时带 {@link #TAB_TASKS}）。 */
+    public static final String EXTRA_TAB = "tab";
+
+    static final int TAB_HOME = 1;
+    public static final int TAB_TASKS = 2;
+    static final int TAB_SETTINGS = 3;
+
+    private YoTabs tabs;
+    private HomePage home;
+    private TasksPage tasks;
+    private SettingsPage settings;
+    private int imeBottomPx;
+    private int barInsetPx;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        AppSettings.applyColorMode(AppSettings.of(this).colorMode());
         super.onCreate(savedInstanceState);
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        YoSystemBar.prepareTransparentSystemBars(this);
+        YoColors colors = YoColors.of(this);
+        YoSystemBar.setStatusBarDarkIcons(this, !colors.isDark());
 
-        // 下载引擎必须在用之前初始化；此前漏了这一步，导致点下载直接失败。
-        try {
-            com.yohu.urldown.download.AssetDownloader.init(this,
-                    new java.io.File(getExternalFilesDir(null), "downloads"));
-        } catch (Throwable t) {
-            android.util.Log.w("YoUrlDown", "下载引擎初始化失败: " + t);
-        }
+        home = new HomePage(this);
+        tasks = new TasksPage(this, () -> tabs.setSelectedId(TAB_HOME));
+        settings = new SettingsPage(this);
+        home.restoreState(savedInstanceState);
+        home.setOnViewTasks(() -> tabs.setSelectedId(TAB_TASKS));
 
-        binding.actionParse.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String input = binding.input.getText() == null
-                        ? "" : binding.input.getText().toString().trim();
-                if (input.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "请先粘贴链接或分享文本",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                startParse(input);
-            }
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(colors.backgroundSecondary());
+
+        int initialTab = savedInstanceState == null
+                ? TAB_HOME : savedInstanceState.getInt(STATE_TAB, TAB_HOME);
+        tabs = YoTabs.create(this)
+                .setBarStyle(YoTabs.BarStyle.FLOATING)
+                .setBarOverlap(true)
+                .setHidePolicy(YoTabs.HidePolicy.FOLLOW_SCROLL)
+                .setItemLayout(YoTabs.ItemLayout.AUTO)
+                .setBleedItemId(YoTabs.NO_BLEED)
+                .addTab(TAB_HOME, getString(R.string.tab_home),
+                        R.drawable.ic_tab_home, R.drawable.ic_tab_home_fill, home.getView())
+                .addTab(TAB_TASKS, getString(R.string.tab_tasks),
+                        R.drawable.ic_tab_tasks, R.drawable.ic_tab_tasks_fill, tasks.getView())
+                .addTab(TAB_SETTINGS, getString(R.string.tab_settings),
+                        R.drawable.ic_tab_settings, R.drawable.ic_tab_settings_fill,
+                        settings.getView())
+                .setSelectedId(initialTab)
+                .setOnChangeListener((index, id) -> onTabChanged(id))
+                .setOnReselectListener((index, id) -> page(id).scrollToTop())
+                .setOnContentInsetListener(inset -> {
+                    barInsetPx = inset;
+                    applyBottomInsets();
+                })
+                .build();
+        root.addView(tabs.getView(), new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+
+        // 顶部让出状态栏；底部导航条由 YoTabs 自己处理（胶囊浮在导航条之上）。
+        // 键盘弹出时根布局不缩（透明系统栏下 adjustResize 不生效），键盘盖住胶囊，
+        // 只把主页的底部留白加到键盘高度，让输入框停在键盘上方。
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = YoSystemBar.systemBarsAndCutout(insets);
+            view.setPadding(bars.left, bars.top, bars.right, 0);
+            imeBottomPx = insets.isVisible(WindowInsetsCompat.Type.ime())
+                    ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : 0;
+            applyBottomInsets();
+            return insets;
         });
 
-        binding.actionDownload.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                downloadLast();
-            }
-        });
+        bindScroller();
+        handleIntent(getIntent());
+    }
 
-        // 支持外部带入链接（adb / 分享），便于自动化真机验证：
-        //   adb shell am start -n com.yohu.urldown/.MainActivity -e url "<链接>"
-        String extra = getIntent() == null ? null : getIntent().getStringExtra("url");
-        if (extra != null && !extra.trim().isEmpty()) {
-            binding.input.setText(extra);
-            startParse(extra.trim());
+    @Override
+    protected void onNewIntent(@NonNull Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && tabs != null && tabs.getSelectedId() == TAB_HOME) {
+            home.onWindowFocused();
         }
     }
 
-    private void startParse(final String input) {
-        binding.actionParse.setEnabled(false);
-        binding.output.setText("解析中…\n输入长度: " + input.length());
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                String text;
-                UrlParseResult parsed = null;
-                try {
-                    parsed = EngineBootstrap.engine(MainActivity.this)
-                            .parse(UrlParseRequest.builder(input).build());
-                    text = render(parsed);
-                } catch (ParseFailure f) {
-                    text = renderFailure(f);
-                } catch (Throwable t) {
-                    text = "解析异常: " + t;
-                }
-                final String finalText = text;
-                final UrlParseResult finalResult = parsed;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        binding.output.setText(finalText);
-                        binding.actionParse.setEnabled(true);
-                        lastResult = finalResult;
-                        binding.actionDownload.setEnabled(finalResult != null
-                                && !finalResult.downloadable().isEmpty());
-                    }
-                });
-            }
-        });
-    }
-
-    private void downloadLast() {
-        final UrlParseResult r = lastResult;
-        if (r == null || r.downloadable().isEmpty()) {
-            Toast.makeText(this, "没有可下载的媒体", Toast.LENGTH_SHORT).show();
-            return;
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (tabs != null) {
+            outState.putInt(STATE_TAB, tabs.getSelectedId());
         }
-        binding.actionDownload.setEnabled(false);
-        binding.output.setText("下载中…\n" + r.title());
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                String text;
-                try {
-                    File dir = new File(getExternalFilesDir(null), "downloads");
-                    DownloadPipeline.Report report = DownloadPipeline.download(r, dir);
-                    text = (report.success ? "下载完成\n\n" : "下载未成功\n\n") + report.text();
-                } catch (Throwable t) {
-                    text = "下载异常: " + t;
-                }
-                final String finalText2 = text;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        binding.output.setText(finalText2);
-                        binding.actionDownload.setEnabled(true);
-                    }
-                });
-            }
-        });
-    }
-
-    private static String render(UrlParseResult r) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("平台: ").append(r.platform().displayName()).append('\n');
-        sb.append("通道: ").append(r.channel()).append('\n');
-        sb.append("作品ID: ").append(nullToDash(r.workId())).append('\n');
-        sb.append("标题: ").append(nullToDash(r.title())).append('\n');
-        if (r.author().nickname() != null) {
-            sb.append("作者: ").append(r.author().nickname()).append('\n');
-        }
-        List<MediaAsset> videos = r.assets(MediaAsset.Kind.VIDEO);
-        List<MediaAsset> images = r.assets(MediaAsset.Kind.IMAGE);
-        List<MediaAsset> audios = r.assets(MediaAsset.Kind.AUDIO);
-        sb.append("媒体: 视频 ").append(videos.size())
-                .append(" / 图片 ").append(images.size())
-                .append(" / 音频 ").append(audios.size()).append('\n');
-        for (MediaAsset a : r.downloadable()) {
-            sb.append('\n').append(a.kind()).append(": ").append(a.url()).append('\n');
-            if (a.width() > 0 && a.height() > 0) {
-                sb.append("  尺寸 ").append(a.width()).append('x').append(a.height());
-            }
-            if (a.durationMs() > 0) {
-                sb.append("  时长 ").append(a.durationMs() / 1000).append('s');
-            }
-            if (!a.alternates().isEmpty()) {
-                sb.append("  备用地址 ").append(a.alternates().size()).append(" 条");
-            }
-            sb.append('\n');
-        }
-        sb.append("\n尝试链:\n")
-                .append(r.trace() == null ? "(无)" : r.trace().summarize());
-        return sb.toString();
-    }
-
-    private static String renderFailure(ParseFailure f) {
-        return "解析失败\n"
-                + "原因: " + f.reason() + "\n"
-                + "通道: " + (f.channel().isEmpty() ? "(无通道认领)" : f.channel()) + "\n"
-                + "可重试: " + (f.retryable() ? "是" : "否") + "\n"
-                + "提示: " + f.userHint() + "\n"
-                + "详情: " + f.getMessage();
-    }
-
-    private static String nullToDash(String s) {
-        return s == null || s.isEmpty() ? "-" : s;
+        home.saveState(outState);
     }
 
     @Override
     protected void onDestroy() {
+        if (tabs != null) {
+            tabs.destroy();
+            tabs = null;
+        }
+        home.destroy();
+        tasks.destroy();
+        settings.destroy();
         super.onDestroy();
-        executor.shutdownNow();
+    }
+
+    @VisibleForTesting
+    void selectTabForTest(int id) {
+        tabs.setSelectedId(id);
+    }
+
+    @VisibleForTesting
+    HomePage homeForTest() {
+        return home;
+    }
+
+    @VisibleForTesting
+    TasksPage tasksForTest() {
+        return tasks;
+    }
+
+    private void onTabChanged(int id) {
+        bindScroller();
+        applyBottomInsets();
+        page(id).onSelected();
+    }
+
+    private void bindScroller() {
+        if (tabs != null) {
+            tabs.bindScroller(page(tabs.getSelectedId()).getScroller());
+        }
+    }
+
+    /**
+     * 页底留白。内容铺到屏幕底，留白 = 胶囊占的高度（含导航条）；
+     * 键盘从屏幕底部升起，比胶囊高时主页留白跟到键盘高度。
+     */
+    private void applyBottomInsets() {
+        home.setBottomInset(Math.max(barInsetPx, imeBottomPx));
+        tasks.setBottomInset(barInsetPx);
+        settings.setBottomInset(barInsetPx);
+    }
+
+    @NonNull
+    private TabPage page(int id) {
+        return switch (id) {
+            case TAB_TASKS -> tasks;
+            case TAB_SETTINGS -> settings;
+            default -> home;
+        };
+    }
+
+    private void handleIntent(@Nullable Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        int tab = intent.getIntExtra(EXTRA_TAB, 0);
+        if (tab != 0) {
+            intent.removeExtra(EXTRA_TAB);
+            tabs.setSelectedId(tab);
+        }
+        String key = Intent.ACTION_SEND.equals(intent.getAction()) ? Intent.EXTRA_TEXT : EXTRA_URL;
+        String url = intent.getStringExtra(key);
+        if (url == null || url.trim().isEmpty()) {
+            return;
+        }
+        // 只处理一次，避免重建时重复解析。
+        intent.removeExtra(key);
+        tabs.setSelectedId(TAB_HOME);
+        home.parseExternal(url.trim());
     }
 }
