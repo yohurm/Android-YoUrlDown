@@ -33,7 +33,7 @@ import com.yohu.urldown.ui.TabPage;
 import com.yohu.urldown.ui.Ui;
 import com.yohu.urldown.ui.widget.PlatformMark;
 import com.yohu.youi.api.controls.YoButton;
-import com.yohu.youi.api.controls.YoTextInput;
+import com.yohu.youi.api.controls.YoSearch;
 import com.yohu.youi.api.feedback.YoDialog;
 import com.yohu.youi.api.feedback.YoToast;
 import com.yohu.youi.api.theme.YoColors;
@@ -67,9 +67,9 @@ public final class HomePage implements TabPage {
 
     private final ScrollView scroll;
     private final LinearLayout column;
-    private final YoTextInput input;
+    private final YoSearch input;
+    private final TextView errorText;
     private final YoButton pasteButton;
-    private final YoButton parseButton;
     private final LinearLayout resultSlot;
     private final View topSpacer;
 
@@ -118,23 +118,31 @@ public final class HomePage implements TabPage {
         subtitleLp.topMargin = dp(6);
         column.addView(subtitle, subtitleLp);
 
-        input = YoTextInput.create(activity)
+        // 搜索栏（YoSearch，对齐 ArkUI Search）：单行 URL 键盘，右侧内嵌“解析”按钮，回车同样提交。
+        input = YoSearch.create(activity)
                 .setPlaceholder(activity.getString(R.string.home_input_hint))
-                .setStyle(YoTextInput.Style.DEFAULT)
-                .setSize(YoTextInput.Size.NORMAL)
-                .setMultiline(true, 3, 6)
-                .setShowCancel(true)
-                .setShowErrorEnabled(true)
+                .setType(YoSearch.SearchType.URL)
+                .setEnterKeyType(YoSearch.EnterKeyType.GO)
+                .setCancelButtonStyle(YoSearch.CancelButtonStyle.INPUT)
+                .setSearchButton(activity.getString(R.string.home_action_parse))
                 .setBackgroundColor(colors.componentBackgroundPrimary())
-                .setOnValueChangeListener(value -> clearError())
+                .setOnChangeListener(value -> clearError())
+                .setOnSubmitListener(value -> submit())
+                .setOnSearchButtonClickListener(value -> submit())
                 .build();
         LinearLayout.LayoutParams inputLp = Ui.matchWrap();
         inputLp.topMargin = dp(24);
         column.addView(input.getView(), inputLp);
 
+        // 搜索栏下方一行：左侧错误提示，右侧“粘贴”文字按钮。
         LinearLayout actions = new LinearLayout(activity);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
+        errorText = Ui.text(activity, "", Ui.TEXT_CAPTION, colors.alert());
+        errorText.setPadding(dp(12), 0, dp(8), 0);
+        errorText.setVisibility(View.INVISIBLE);
+        actions.addView(errorText, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         pasteButton = YoButton.create(activity)
                 .setText(activity.getString(R.string.home_action_paste))
                 .setStyle(YoButton.Style.TEXT)
@@ -142,18 +150,8 @@ public final class HomePage implements TabPage {
                 .setOnClickListener(v -> pasteFromClipboard(true))
                 .build();
         actions.addView(pasteButton.getView(), Ui.wrap());
-        actions.addView(new View(activity), new LinearLayout.LayoutParams(0, 1, 1f));
-        parseButton = YoButton.create(activity)
-                .setText(activity.getString(R.string.home_action_parse))
-                .setStyle(YoButton.Style.PRIMARY)
-                .setSize(YoButton.Size.DEFAULT)
-                .setOnClickListener(v -> submit())
-                .build();
-        LinearLayout.LayoutParams parseLp = new LinearLayout.LayoutParams(dp(120),
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        actions.addView(parseButton.getView(), parseLp);
         LinearLayout.LayoutParams actionsLp = Ui.matchWrap();
-        actionsLp.topMargin = dp(12);
+        actionsLp.topMargin = dp(4);
         column.addView(actions, actionsLp);
 
         resultSlot = new LinearLayout(activity);
@@ -215,13 +213,13 @@ public final class HomePage implements TabPage {
         }
         CharSequence text = in.getCharSequence(STATE_INPUT);
         if (text != null && text.length() > 0) {
-            input.setText(text);
+            setInput(text);
         }
     }
 
     /** 外部带入的链接（adb / 分享）：填入并直接解析。 */
     public void parseExternal(@NonNull String text) {
-        input.setText(text);
+        setInput(text);
         submit();
     }
 
@@ -238,7 +236,7 @@ public final class HomePage implements TabPage {
             return;
         }
         lastAutoClip = clip;
-        input.setText(clip);
+        setInput(clip);
         YoToast.show(activity, activity.getString(R.string.home_clipboard_filled));
     }
 
@@ -251,7 +249,7 @@ public final class HomePage implements TabPage {
             return;
         }
         lastAutoClip = clip;
-        input.setText(clip);
+        setInput(clip);
     }
 
     private void submit() {
@@ -260,7 +258,7 @@ public final class HomePage implements TabPage {
         }
         String text = input.getText().toString().trim();
         if (text.isEmpty()) {
-            input.showError(activity.getString(R.string.home_error_empty));
+            showError(activity.getString(R.string.home_error_empty));
             return;
         }
         hideKeyboard();
@@ -270,7 +268,7 @@ public final class HomePage implements TabPage {
     private void startParse(String text) {
         parsing = true;
         final int seq = ++requestSeq;
-        parseButton.setLoading(true);
+        input.setSearchButton(activity.getString(R.string.home_action_parsing));
         pasteButton.setEnabled(false);
         input.setEnabled(false);
         PARSE_EXECUTOR.execute(() -> {
@@ -293,7 +291,7 @@ public final class HomePage implements TabPage {
                     return;
                 }
                 parsing = false;
-                parseButton.setLoading(false);
+                input.setSearchButton(activity.getString(R.string.home_action_parse));
                 pasteButton.setEnabled(true);
                 input.setEnabled(true);
                 if (r != null) {
@@ -303,6 +301,11 @@ public final class HomePage implements TabPage {
                 }
             });
         });
+    }
+
+    @VisibleForTesting
+    public void setInputForTest(@NonNull CharSequence text) {
+        setInput(text);
     }
 
     @VisibleForTesting
@@ -391,11 +394,24 @@ public final class HomePage implements TabPage {
         topSpacer.setVisibility(View.GONE);
     }
 
+    /** 程序写入（剪贴板/分享/恢复）不会触发 OnChange，这里一并清掉旧错误。 */
+    private void setInput(@NonNull CharSequence text) {
+        input.setText(text);
+        clearError();
+    }
+
+    private void showError(@NonNull CharSequence message) {
+        errorText.setText(message);
+        errorText.setVisibility(View.VISIBLE);
+    }
+
     private void clearError() {
-        input.showError(null);
+        errorText.setText("");
+        errorText.setVisibility(View.INVISIBLE);
     }
 
     private void hideKeyboard() {
+        input.getController().stopEditing();
         View focus = activity.getCurrentFocus();
         InputMethodManager imm = (InputMethodManager) activity
                 .getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -489,6 +505,5 @@ public final class HomePage implements TabPage {
         destroyed = true;
         input.destroy();
         pasteButton.destroy();
-        parseButton.destroy();
     }
 }

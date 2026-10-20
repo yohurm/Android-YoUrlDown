@@ -61,6 +61,7 @@ public class UiScreenshotTest {
         idleFor(100);
         save(activity, theme + "-1-home-idle");
 
+        activity.homeForTest().setInputForTest("https://v.douyin.com/iRNBho6u/");
         activity.homeForTest().showResultForTest(sampleResult());
         idle();
         save(activity, theme + "-2-home-result");
