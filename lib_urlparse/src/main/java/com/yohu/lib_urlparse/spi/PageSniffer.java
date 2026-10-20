@@ -20,9 +20,4 @@ public interface PageSniffer {
 
     /** 释放底层资源。 */
     void release();
-
-    /** 需要落盘临时文件的实现可忽略此方法；默认无操作。 */
-    default void setWorkDir(File dir) {
-        // no-op
-    }
 }

@@ -105,15 +105,6 @@ public class RulesSmokeTest {
                 XiaohongshuRules.extractObjectText(html, "__NEXT_DATA__"));
     }
 
-    // ------------------------------------------------------------------ 微信公众号
-
-    @Test
-    public void wechatHostDetection() {
-        assertTrue(WeChatRules.isWeChatHost("mp.weixin.qq.com"));
-        assertTrue(WeChatRules.isWeChatHost("weixin.qq.com"));
-        assertFalse(WeChatRules.isWeChatHost("example.com"));
-    }
-
     // ------------------------------------------------------------------ Instagram
 
     @Test

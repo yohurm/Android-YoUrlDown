@@ -162,7 +162,5 @@ public class DouyinWebviewProviderTest {
         String q = DouyinScriptBuilder.quote("a\"b\nc");
         assertEquals("\"a\\\"b\\nc\"", q);
         assertTrue(DouyinScriptBuilder.build(q).contains(q));
-        assertTrue("就绪探针应检查页面解析器是否存在",
-                DouyinScriptBuilder.buildReadyProbe().contains("DouyinParser"));
     }
 }

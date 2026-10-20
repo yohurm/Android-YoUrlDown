@@ -30,7 +30,7 @@ public interface ParseContext {
     Platform platformHint();
 
     /**
-     * 取注入的服务实现（{@code JsEvaluator} / {@code PageSniffer} / {@code MediaMuxer}）。
+     * 取注入的服务实现（{@code JsEvaluator} / {@code PageSniffer}）。
      *
      * @return 实现；未注入时返回 {@code null}（调用方应抛 {@code CHANNEL_DISABLED}）
      */

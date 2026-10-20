@@ -3,22 +3,8 @@ package com.yohu.lib_urlparse.provider.douyin;
 import com.yohu.lib_urlparse.rules.DouyinRules;
 
 /**
- * 构造注入抖音页面的解析脚本。
- *
- * <p><b>出处</b>：方法 {@code DouyinWebParser.buildParseScript(String):String}
- * （VMP 代码块 {@code 0x1f12ea}，33 个码元，exact_fit=true）。反汇编显示它做的事是：
- * <pre>
- *   JSONObject.quote(输入)                       // 转义为 JS 字面量
- *   new StringBuilder()
- *     .append("\"\"")                            // T2[5]
- *     .append(SCRIPT_BOOTSTRAP_PREFIX)           // T2[91]
- *     .append(").then(...)...")                  // T2[40]
- *     .toString()
- * </pre>
- * 也就是说：脚本是 {@code <前缀> + JSON 字符串字面量 + <后缀>} 的拼接，
+ * 构造注入抖音页面的解析脚本：{@code <前缀> + JSON 字符串字面量 + <后缀>}，
  * 前缀以 {@code DouyinParser.parse(} 结尾，后缀以 {@code ).then(report)...} 开头。
- *
- * <p>证据链：{@code 09_reports/18_VMP字节码反汇编.md} §18.8.3。
  */
 public final class DouyinScriptBuilder {
 
@@ -36,19 +22,10 @@ public final class DouyinScriptBuilder {
     }
 
     /**
-     * 生成"探测页面解析脚本是否就绪"的脚本（证据：常量池 T2[1] 的就绪探针）。
-     */
-    public static String buildReadyProbe() {
-        return DouyinRules.READY_PROBE;
-    }
-
-    /**
      * 把任意文本转义成合法的 JSON 字符串字面量（含两端引号）。
      *
-     * <p>对应样本里调用的 {@code org/json/JSONObject.quote(String)}：
-     * 反汇编显示 {@code buildParseScript} 的第一个 invoke 就是它
-     * （{@code org/json/JSONObject.quote}）。这里给出等价的最小实现，
-     * 以便在非 Android 环境（如单元测试）也能复用。
+     * <p>与 {@code org.json.JSONObject.quote(String)} 等价的最小实现，
+     * 不依赖 Android 的 org.json，纯 JVM 单测也能用。
      */
     public static String quote(String raw) {
         if (raw == null) {

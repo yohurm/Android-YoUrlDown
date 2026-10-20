@@ -1,10 +1,8 @@
 package com.yohu.lib_urlparse.util;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,15 +33,6 @@ public final class UrlUtils {
     }
 
     // ------------------------------------------------------------------ 组成
-
-    /** 协议（小写），如 {@code https}；无法识别返回 {@code null}。 */
-    public static String scheme(String url) {
-        if (Strings.isBlank(url)) {
-            return null;
-        }
-        int i = url.indexOf("://");
-        return i <= 0 ? null : url.substring(0, i).toLowerCase(Locale.ROOT);
-    }
 
     /** 主机（小写，去端口）；无法识别返回 {@code null}。 */
     public static String host(String url) {
@@ -83,47 +72,6 @@ public final class UrlUtils {
             }
         }
         return authority.toLowerCase(Locale.ROOT);
-    }
-
-    /** 路径部分（以 {@code /} 开头；没有则返回空串）。 */
-    public static String path(String url) {
-        if (Strings.isBlank(url)) {
-            return "";
-        }
-        int from = url.indexOf("://");
-        from = from >= 0 ? from + 3 : 0;
-        int slash = url.indexOf('/', from);
-        if (slash < 0) {
-            return "";
-        }
-        int end = url.length();
-        int q = url.indexOf('?', slash);
-        int h = url.indexOf('#', slash);
-        if (q >= 0 && q < end) {
-            end = q;
-        }
-        if (h >= 0 && h < end) {
-            end = h;
-        }
-        return url.substring(slash, end);
-    }
-
-    /** 去掉 {@code #fragment}。 */
-    public static String stripFragment(String url) {
-        if (url == null) {
-            return null;
-        }
-        int i = url.indexOf('#');
-        return i < 0 ? url : url.substring(0, i);
-    }
-
-    /** 是否 http/https。 */
-    public static boolean isHttpUrl(String s) {
-        if (Strings.isBlank(s)) {
-            return false;
-        }
-        String scheme = scheme(s);
-        return "http".equals(scheme) || "https".equals(scheme);
     }
 
     // ------------------------------------------------------------------ 提取
@@ -190,67 +138,5 @@ public final class UrlUtils {
             }
         }
         return true;
-    }
-
-    // ------------------------------------------------------------------ 查询串
-
-    /** 取单个查询参数（URL 解码后）；不存在返回 {@code null}。 */
-    public static String queryParam(String url, String name) {
-        return queryParams(url).get(name);
-    }
-
-    /** 解析查询串为有序 Map（值已 URL 解码；无值参数映射为空串）。 */
-    public static Map<String, String> queryParams(String url) {
-        Map<String, String> out = new LinkedHashMap<>();
-        if (Strings.isBlank(url)) {
-            return out;
-        }
-        int q = url.indexOf('?');
-        if (q < 0 || q + 1 >= url.length()) {
-            return out;
-        }
-        int end = url.indexOf('#', q);
-        String query = end < 0 ? url.substring(q + 1) : url.substring(q + 1, end);
-        for (String pair : query.split("&")) {
-            if (pair.isEmpty()) {
-                continue;
-            }
-            int eq = pair.indexOf('=');
-            if (eq < 0) {
-                out.put(EncodingUtils.urlDecode(pair), "");
-            } else {
-                out.put(EncodingUtils.urlDecode(pair.substring(0, eq)),
-                        EncodingUtils.urlDecode(pair.substring(eq + 1)));
-            }
-        }
-        return out;
-    }
-
-    /** 把参数拼到 URL 上（已解码的值会被重新编码）。 */
-    public static String withQuery(String url, Map<String, String> params) {
-        if (url == null || params == null || params.isEmpty()) {
-            return url;
-        }
-        StringBuilder sb = new StringBuilder(url);
-        boolean hasQuery = url.indexOf('?') >= 0;
-        for (Map.Entry<String, String> e : params.entrySet()) {
-            sb.append(hasQuery ? '&' : '?');
-            hasQuery = true;
-            sb.append(EncodingUtils.urlEncode(e.getKey()));
-            if (e.getValue() != null && !e.getValue().isEmpty()) {
-                sb.append('=').append(EncodingUtils.urlEncode(e.getValue()));
-            }
-        }
-        return sb.toString();
-    }
-
-    /** 主机是否等于给定域名或其后缀（{@code m.example.com} 匹配 {@code example.com}）。 */
-    public static boolean hostMatches(String host, String domain) {
-        if (host == null || domain == null) {
-            return false;
-        }
-        String h = host.toLowerCase(Locale.ROOT);
-        String d = domain.toLowerCase(Locale.ROOT);
-        return h.equals(d) || h.endsWith("." + d);
     }
 }

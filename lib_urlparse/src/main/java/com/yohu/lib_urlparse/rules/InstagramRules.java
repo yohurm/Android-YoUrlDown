@@ -1,8 +1,6 @@
 package com.yohu.lib_urlparse.rules;
 
-
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -10,14 +8,9 @@ import java.util.regex.Pattern;
 /**
  * Instagram 抽取规则。
  *
- * <p><b>溯源</b>：样本对 Instagram 只留了平台名与一个示例链接
- * （{@code https://www.instagram.com/p/Ca3V3zGIZ08/}，见报告 11 §11.1 与 16 §16.2），
- * 没有可还原的解析规则。因此这里走 **Instagram 自己的公开嵌入页**
- * （{@code /p/<code>/embed/captioned/}）——它是站点为"在别的网页里展示这个帖子"而提供的
- * 公开接口，无需登录、无需任何凭据。这是本工程自行选择的机制，不是从样本还原的。
- *
- * <p><b>形态说明</b>：样本把 Instagram 归类为"图集"（证据字面量 {@code instagram图集}），
- * 因此本规则对**轮播（sidecar）**与单图/单视频都做覆盖。
+ * <p>走 Instagram 自己的公开嵌入页（{@code /p/<code>/embed/captioned/}）——
+ * 站点为"在别的网页里展示这个帖子"而提供的公开接口，无需登录、无需任何凭据。
+ * 覆盖轮播（sidecar）、单图与单视频三种形态。
  */
 public final class InstagramRules {
 
@@ -54,11 +47,6 @@ public final class InstagramRules {
         return "https://www.instagram.com/p/" + shortcode + "/embed/captioned/";
     }
 
-    /** 备用嵌入页地址。 */
-    public static String embedUrlPlain(String shortcode) {
-        return "https://www.instagram.com/p/" + shortcode + "/embed/";
-    }
-
     // ---------------------------------------------------------------- 页面抽取
 
     /**
@@ -66,7 +54,7 @@ public final class InstagramRules {
      *
      * <p>分层（每层都记进 layers，便于判断"页面没数据"还是"字段改名"）：
      * <ol>
-     *   <li>轮播：{@code edge_sidecar_to_children} 里的每个子项（样本称之为"图集"）；</li>
+     *   <li>轮播：{@code edge_sidecar_to_children} 里的每个子项（图集）；</li>
      *   <li>{@code "video_url"} —— 视频直链；</li>
      *   <li>{@code "display_url"} 或 {@code <img class="EmbeddedMediaImage" src=…>} —— 图片直链。</li>
      * </ol>
@@ -319,21 +307,6 @@ public final class InstagramRules {
         return m2.find() ? unescape(m2.group(1)) : null;
     }
 
-    /** 取 key 之后若干段（以 {@code }} 粗略切分），用于轮播子项。 */
-    static List<String> segmentsAfter(String html, String key, int max) {
-        List<String> out = new ArrayList<>();
-        int at = html.indexOf(key);
-        while (at >= 0 && out.size() < max) {
-            int end = html.indexOf("}]", at);
-            if (end < 0) {
-                break;
-            }
-            out.add(html.substring(at, Math.min(html.length(), end + 2)));
-            at = html.indexOf(key, end);
-        }
-        return out;
-    }
-
     /**
      * 解 HTML 实体。**必须做**：真实嵌入页把媒体地址写成
      * {@code src="https://…jpg?stp=…&amp;_nc_cat=110&amp;…"}——
@@ -392,15 +365,6 @@ public final class InstagramRules {
         public int mediaCount() {
             return videos.size() + images.size();
         }
-
-        /** 去重后的全部媒体（视频在前）。 */
-        public List<String> allMedia() {
-            LinkedHashSet<String> set = new LinkedHashSet<>(videos);
-            set.addAll(images);
-            return new ArrayList<>(set);
-        }
     }
 }
-
-
 

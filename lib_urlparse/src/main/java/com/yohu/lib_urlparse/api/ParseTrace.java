@@ -2,9 +2,7 @@ package com.yohu.lib_urlparse.api;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 解析尝试链：**结构化证据**。
@@ -15,7 +13,7 @@ import java.util.Map;
  *   <li>产出可对外展示的成功/失败证据（"哪个通道成的、耗时多少"）。</li>
  * </ol>
  *
- * <p>隐私边界：{@link #facts()} 只允许放**可公开**的事实（状态码、长度、命中的规则名），
+ * <p>隐私边界：{@link Attempt#detail()} 只放可公开的信息（状态码、长度、命中的规则名），
  * 不得放响应正文或凭据。
  */
 public final class ParseTrace {
@@ -77,12 +75,10 @@ public final class ParseTrace {
 
     private final String resolvedUrl;
     private final List<Attempt> attempts;
-    private final Map<String, String> facts;
 
     private ParseTrace(Builder b) {
         this.resolvedUrl = b.resolvedUrl;
         this.attempts = Collections.unmodifiableList(new ArrayList<>(b.attempts));
-        this.facts = Collections.unmodifiableMap(new LinkedHashMap<>(b.facts));
     }
 
     public static Builder builder() {
@@ -97,21 +93,6 @@ public final class ParseTrace {
     /** 按发生顺序记录的尝试。 */
     public List<Attempt> attempts() {
         return attempts;
-    }
-
-    /** 可公开的事实键值。 */
-    public Map<String, String> facts() {
-        return facts;
-    }
-
-    /** 是否至少有一次成功。 */
-    public boolean hasSuccess() {
-        for (Attempt a : attempts) {
-            if (a.verdict() == Verdict.OK) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** 便于日志阅读的紧凑串。 */
@@ -137,7 +118,6 @@ public final class ParseTrace {
     public static final class Builder {
         private String resolvedUrl;
         private final List<Attempt> attempts = new ArrayList<>();
-        private final Map<String, String> facts = new LinkedHashMap<>();
 
         public Builder resolvedUrl(String v) {
             this.resolvedUrl = v;
@@ -147,13 +127,6 @@ public final class ParseTrace {
         public Builder attempt(String channel, Verdict verdict, FailureReason reason,
                               long elapsedMs, String detail) {
             this.attempts.add(new Attempt(channel, verdict, reason, elapsedMs, detail));
-            return this;
-        }
-
-        public Builder fact(String key, String value) {
-            if (key != null && value != null) {
-                this.facts.put(key, value);
-            }
             return this;
         }
 

@@ -7,11 +7,9 @@ import java.util.regex.Pattern;
 /**
  * 微博通道的常量与抽取规则。
  *
- * <p><b>溯源（必须说清楚）</b>：被分析样本对微博只留了"云 API"这条路（需要作者的私有服务），
- * 因此本通道不是从样本还原的，而是本工程基于**公开且被长期维护的实现**重建的：
- * yt-dlp 的 {@code yt_dlp/extractor/weibo.py}（公开仓库）。
- * 其中的端点、JSON 字段路径、访客 cookie 流程都直接来自该实现，而不是从博客或猜测得来。
- * 这不涉及任何私有凭据——访客 cookie 由微博自己下发给未登录访客。
+ * <p><b>参考实现</b>：端点、JSON 字段路径与访客 cookie 流程对齐公开维护的
+ * yt-dlp {@code yt_dlp/extractor/weibo.py}。不涉及任何私有凭据——
+ * 访客 cookie 由微博自己下发给未登录访客。
  *
  * <p><b>为什么不能靠嗅探</b>：实测（2026-10 真机）微信/快手这类 H5 分享页根本不在页面里
  * 放媒体地址；微博同理——正文媒体地址在 {@code ajax/statuses/show} 的 JSON 里，
@@ -126,12 +124,6 @@ public final class WeiboRules {
     }
 
     // ---------------------------------------------------------------- 字段路径（对齐 yt-dlp）
-
-    /** 媒体播放地址的字段路径：{@code page_info.media_info.playback_list[].play_info.url}。 */
-    public static final String PATH_PLAYBACK = "page_info.media_info.playback_list";
-
-    /** 多图/多媒体的字段：{@code mix_media_info.items[]}，其中 {@code type != "pic"} 为视频。 */
-    public static final String PATH_MIX = "mix_media_info.items";
 
     /**
      * 降级判据：{@code media_info} 里形如 {@code label=xxx&template=1280x720} 的地址。

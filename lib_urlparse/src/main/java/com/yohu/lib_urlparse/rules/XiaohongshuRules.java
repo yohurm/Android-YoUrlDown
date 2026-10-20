@@ -13,13 +13,10 @@ import java.util.regex.Pattern;
 /**
  * 小红书抽取规则。
  *
- * <p><b>溯源（必须说清楚）</b>：样本对小红书只留了"云 API"这条路（需作者私有服务），
- * 因此本通道不是从样本还原的，而是依据**公开且被长期维护**的实现重建：
- * {@code JoeanAmier/XHS-Downloader} 的
- * {@code source/application/video.py}、{@code image.py}、{@code explore.py}。
- * 其中的字段路径（{@code video.consumer.originVideoKey}、
+ * <p><b>参考实现</b>：字段路径（{@code video.consumer.originVideoKey}、
  * {@code video.media.stream.*[].masterUrl/backupUrls}、{@code imageList[].urlDefault}
- * 及其 token 提取方式）都直接来自该实现，而不是猜测。
+ * 及其 token 提取方式）对齐公开维护的 {@code JoeanAmier/XHS-Downloader}
+ * （{@code source/application/video.py}、{@code image.py}、{@code explore.py}）。
  *
  * <p><b>一个已知风险</b>：该实现用 {@code curl_cffi} 且指定 {@code impersonate}——
  * 也就是**伪造浏览器 TLS 指纹**。这说明小红书很可能对 TLS/HTTP2 指纹有校验，
@@ -44,8 +41,6 @@ public final class XiaohongshuRules {
 
     public static final Pattern PATTERN_NOTE_ID =
             Pattern.compile("(?:explore|discovery/item|note)/([0-9a-fA-F]{16,32})");
-    public static final Pattern PATTERN_PROFILE_ID =
-            Pattern.compile("(?:user/profile|profile)/([0-9a-fA-F]{16,32})");
 
     /** 数据变量名（实测哪些存在由宿主记录，见 layers 诊断）。 */
     public static final String[] DATA_VARS = {
@@ -77,14 +72,6 @@ public final class XiaohongshuRules {
             return null;
         }
         Matcher m = PATTERN_NOTE_ID.matcher(url);
-        return m.find() ? m.group(1) : null;
-    }
-
-    public static String extractProfileId(String url) {
-        if (url == null) {
-            return null;
-        }
-        Matcher m = PATTERN_PROFILE_ID.matcher(url);
         return m.find() ? m.group(1) : null;
     }
 

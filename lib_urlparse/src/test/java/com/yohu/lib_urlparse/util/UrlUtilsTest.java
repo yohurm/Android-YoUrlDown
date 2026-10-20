@@ -2,9 +2,6 @@ package com.yohu.lib_urlparse.util;
 
 import org.junit.Test;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -53,31 +50,6 @@ public class UrlUtilsTest {
     public void parsesAuthorityWithUserInfoAndPort() {
         String url = "https://user:pass@M.Example.COM:8080/p?q=1#frag";
         assertEquals("m.example.com", UrlUtils.host(url));
-        assertEquals("https", UrlUtils.scheme(url));
-        assertEquals("/p", UrlUtils.path(url));
-        assertEquals("1", UrlUtils.queryParam(url, "q"));
-        assertTrue(UrlUtils.isHttpUrl(url));
-        assertEquals("https://user:pass@M.Example.COM:8080/p?q=1", UrlUtils.stripFragment(url));
-    }
-
-    @Test
-    public void parsesQueryParamsDecoded() {
-        Map<String, String> params = UrlUtils.queryParams("https://a.test/p?k=%E4%B8%AD&empty&x=1");
-        assertEquals("中", params.get("k"));
-        assertEquals("", params.get("empty"));
-        assertEquals("1", params.get("x"));
-    }
-
-    @Test
-    public void buildsQueryString() {
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("k", "中");
-        params.put("n", "2");
-        assertEquals("https://a.test/p?k=%E4%B8%AD&n=2",
-                UrlUtils.withQuery("https://a.test/p", params));
-        // 已有查询串时用 &
-        assertEquals("https://a.test/p?a=1&k=%E4%B8%AD&n=2",
-                UrlUtils.withQuery("https://a.test/p?a=1", params));
     }
 
     @Test
@@ -89,19 +61,8 @@ public class UrlUtilsTest {
     }
 
     @Test
-    public void hostMatchesSuffixOnly() {
-        assertTrue(UrlUtils.hostMatches("m.example.com", "example.com"));
-        assertTrue(UrlUtils.hostMatches("example.com", "example.com"));
-        // 不能误伤：notexample.com 不是 example.com 的子域
-        assertFalse(UrlUtils.hostMatches("notexample.com", "example.com"));
-        assertFalse(UrlUtils.hostMatches(null, "example.com"));
-    }
-
-    @Test
     public void handlesMalformedInputWithoutThrowing() {
         assertNull(UrlUtils.host(""));
         assertNull(UrlUtils.host("not a url"));
-        assertEquals("", UrlUtils.path(""));
-        assertFalse(UrlUtils.isHttpUrl("ftp://a.test/x"));
     }
 }

@@ -1,5 +1,6 @@
 package com.yohu.lib_urlparse.provider.toutiao;
 
+import com.yohu.lib_urlparse.api.ParseTrace;
 import com.yohu.lib_urlparse.api.FailureReason;
 import com.yohu.lib_urlparse.api.MediaAsset;
 import com.yohu.lib_urlparse.api.ParseFailure;
@@ -111,7 +112,8 @@ public class ToutiaoWebProviderTest {
         assertEquals(1, http.pageCalls);
         assertEquals(1, http.vodCalls);
         // trace 必须记下成功的那一跳
-        assertTrue(r.trace().hasSuccess());
+        assertEquals(ParseTrace.Verdict.OK,
+                r.trace().attempts().get(r.trace().attempts().size() - 1).verdict());
     }
 
     @Test

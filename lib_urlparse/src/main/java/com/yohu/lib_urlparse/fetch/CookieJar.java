@@ -196,12 +196,6 @@ public final class CookieJar {
         return n;
     }
 
-    /** 供测试/诊断：返回某域下所有 Cookie（副本）。 */
-    public synchronized Map<String, String> cookiesFor(String domain) {
-        Map<String, String> m = byDomain.get(domain.toLowerCase(Locale.ROOT));
-        return m == null ? new LinkedHashMap<String, String>() : new LinkedHashMap<>(m);
-    }
-
     public synchronized void clear() {
         byDomain.clear();
     }

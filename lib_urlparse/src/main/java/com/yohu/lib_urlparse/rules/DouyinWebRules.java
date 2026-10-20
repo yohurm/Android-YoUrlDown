@@ -11,11 +11,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 抖音分享页的**自包含**抽取规则（不依赖样本的私有解析脚本/云服务）。
+ * 抖音分享页的**自包含**抽取规则（不依赖任何远程解析脚本或云服务）。
  *
- * <p><b>背景</b>：样本对抖音走的是"WebView 注入远程解析脚本 + 云 API"，
- * 两者都需要作者的私有服务。本工程改为**直接从分享页里已存在的结构化数据取地址**——
- * 页面自己会把作品信息（含播放地址）序列化进 HTML，这是公开、可复现的路径。
+ * <p>直接从分享页里已存在的结构化数据取地址——页面自己会把作品信息（含播放地址）
+ * 序列化进 HTML，这是公开、可复现的路径。
  *
  * <p><b>为什么分层</b>：抖音页面结构随版本变化，而且同一内容在
  * {@code _ROUTER_DATA} / {@code RENDER_DATA} / 内联 JSON 之间搬过家。
@@ -40,16 +39,10 @@ public final class DouyinWebRules {
     public static final Pattern PATTERN_MP4 =
             Pattern.compile("https?://[^\"'\\\\\\s<>]+?\\.mp4[^\"'\\\\\\s<>]*", Pattern.CASE_INSENSITIVE);
 
-    /** 数据变量赋值：{@code window._ROUTER_DATA = {...};} / {@code <script id="RENDER_DATA" type="application/json">}。 */
-    public static final Pattern PATTERN_ROUTER_ASSIGN =
-            Pattern.compile("_ROUTER_DATA\\s*=\\s*(\\{.*?\\})\\s*;?\\s*</script>", Pattern.DOTALL);
-    public static final Pattern PATTERN_SCRIPT_JSON =
-            Pattern.compile("<script[^>]*id=[\"']([^\"']+)[\"'][^>]*>(.*?)</script>", Pattern.DOTALL);
-
     /**
      * 无痕替换：把播放地址里的 {@code /playwm/} 换成 {@code /play/}。
      *
-     * <p><b>性质：【推断】</b>这是社区长期观察到的行为（带水印地址与无水印地址只差这一段路径），
+     * <p><b>说明</b>：这是社区长期观察到的行为（带水印地址与无水印地址只差这一段路径），
      * 但抖音随时可能改变语义。因此本工程的做法是：**两个地址都留下**——
      * 无水印的作为主地址，原始地址作为 {@code alternate} 备用；
      * 这样即使推断失效，用户仍能拿到可下载的文件，而不是一个 403。
@@ -59,11 +52,6 @@ public final class DouyinWebRules {
             return null;
         }
         return url.replace("/playwm/", "/play/");
-    }
-
-    /** 是否为无水印形态（用于日志/判断是否需要加备用地址）。 */
-    public static boolean watermarkFreeForm(String url) {
-        return url != null && url.contains("/play/") && !url.contains("/playwm/");
     }
 
     // ------------------------------------------------------------------ 结构化层
@@ -195,7 +183,7 @@ public final class DouyinWebRules {
      * {@code ...~tplv-dy-lqen-new-water:1056:1920:xxx:q80.webp}，
      * 其中 {@code -water} 段即水印变体。去掉后请求无水印版本。
      *
-     * <p><b>性质：【推断】</b>与视频的 {@code playwm→play} 同类：属于社区长期观察到的行为，
+     * <p><b>说明</b>：与视频的 {@code playwm→play} 同类：属于社区长期观察到的行为，
      * 官方随时可能改动。因此与视频一样，**原始地址保留为 alternate**，
      * 推断失效时用户仍能下载到（带水印的）图片，而不是 404。
      */
@@ -206,16 +194,6 @@ public final class DouyinWebRules {
         return url.replace("tplv-dy-lqen-new-water", "tplv-dy-lqen-new")
                 .replace("-water:", ":")
                 .replace("~water:", "~");
-    }
-
-    /** 该图片地址是否带水印变体标记。 */
-    public static boolean isWatermarkedImage(String url) {
-        return url != null && (url.contains("-water") || url.contains("~water"));
-    }
-
-    /** 页面的水印图片请求只可能来自图集（视频走 playwm）——诊断用。 */
-    public static boolean mentionsImageWatermark(String html) {
-        return html != null && html.contains("tplv-dy-lqen-new-water");
     }
 
     /** 标题/文案。 */

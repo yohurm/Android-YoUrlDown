@@ -3,7 +3,7 @@ package com.yohu.lib_urlparse.api;
 /**
  * 解析请求。
  *
- * <p>只描述"要解析什么"和"允许多久"，不描述"怎么下载"——下载是 {@code transfer} 层的事。
+ * <p>只描述"要解析什么"和"允许多久"，不描述"怎么下载"——下载由宿主负责。
  * 这条边界让引擎可以完全不带 IO 落盘地跑单测。
  */
 public final class UrlParseRequest {

@@ -146,7 +146,7 @@ public final class UrlParseEngine {
             return this;
         }
 
-        /** 注入服务实现（{@code JsEvaluator} / {@code PageSniffer} / {@code MediaMuxer}）。 */
+        /** 注入服务实现（{@code JsEvaluator} / {@code PageSniffer}）。 */
         public <T> Builder service(Class<T> type, T impl) {
             if (type != null) {
                 if (impl == null) {

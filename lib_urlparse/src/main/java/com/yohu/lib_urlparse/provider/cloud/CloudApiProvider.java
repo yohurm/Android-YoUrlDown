@@ -30,7 +30,7 @@ import java.util.Map;
  *   <li>没有配置时抛 {@link FailureReason#CREDENTIALS_MISSING}，而不是"尝试某个默认地址"。</li>
  * </ul>
  *
- * <p>协议按旧样本的形态约定：{@code POST endpoint}，body 为
+ * <p>协议约定：{@code POST endpoint}，body 为
  * {@code {"apiKey": <key>, "data": {"url": <链接>}}}；
  * 响应里取 {@code data.url}（视频）与 {@code data.images[]}（图集），
  * 若字段名不同则退化为"在响应里找第一个视频地址 / 图片地址"。
@@ -133,7 +133,7 @@ public final class CloudApiProvider implements ParseProvider {
             if (title != null && !title.isEmpty()) {
                 out.title(title);
             }
-            // 旧样本的错误约定：msg 前缀 + 具体原因
+            // 错误约定：msg 前缀 + 具体原因
             String msg = json.optString("msg", null);
             if (msg != null && msg.startsWith(CloudApiRules.MSG_PARSE_FAILED)) {
                 throw new ParseFailure(FailureReason.UNEXPECTED_RESPONSE, channel(),
@@ -160,7 +160,7 @@ public final class CloudApiProvider implements ParseProvider {
         }
 
         if (videos == 0 && images == 0) {
-            // 兜底：在响应文本里按扩展名找地址（兼容字段名与样本不同）
+            // 兜底：在响应文本里按扩展名找地址（兼容字段名不一致的服务端）
             for (String candidate : UrlUtils.extractAllUrls(response)) {
                 if (MediaExtensions.looksLikeVideo(candidate)) {
                     out.asset(MediaAsset.video(candidate).mimeType("video/mp4").build());
@@ -191,7 +191,7 @@ public final class CloudApiProvider implements ParseProvider {
         return c == null ? CredentialProvider.NONE : c;
     }
 
-    /** 按旧样本的 payload 形态构造请求体。 */
+    /** 按约定的 payload 形态构造请求体。 */
     static String buildPayload(String apiKey, String url) {
         JSONObject data = new JSONObject();
         JSONObject root = new JSONObject();
