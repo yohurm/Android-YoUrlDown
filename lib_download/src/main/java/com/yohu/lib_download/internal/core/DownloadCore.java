@@ -119,6 +119,7 @@ public final class DownloadCore implements StatusStore {
                     YoDownload.State.ADDED, System.currentTimeMillis(), System.currentTimeMillis(),
                     request.headers(), request.blockCount(), request.networkType(),
                     request.priority(), request.title(), request.mimeType());
+            inheritProgress(info, task);
             config.breakpointStore().upsert(info);
             DownloadWorker worker = new DownloadWorker(config, callbacks, strategy, monitor);
             dispatcher.enqueue(new DownloadCall(task, safeListener, dispatcher, worker));
@@ -280,6 +281,25 @@ public final class DownloadCore implements StatusStore {
                 task.destinationFile(), request.replaceExisting())) {
             throw new DownloadException(YoDownload.Error.STORAGE, "Destination is not writable");
         }
+    }
+
+    /**
+     * 同一 ID 重新入队（暂停后继续、失败后重试）时沿用上一次的分块进度。
+     *
+     * <p>入队会用新的请求参数覆盖断点记录；不沿用的话分块被清空，
+     * {@link DownloadWorker} 会从 0 重新下载，断点续传形同虚设。
+     * 只在上次未到终态、且临时文件仍在时沿用。
+     */
+    private void inheritProgress(@NonNull BreakpointInfo info, @NonNull DownloadTaskImpl task) {
+        BreakpointInfo previous = config.breakpointStore().query(task.id());
+        if (previous == null || isTerminal(previous.state()) || previous.blocks().isEmpty()
+                || !task.tempFile().exists()) {
+            return;
+        }
+        info.totalLength(previous.totalLength());
+        info.etag(previous.etag());
+        info.lastModified(previous.lastModified());
+        info.replaceBlocks(previous.blocks());
     }
 
     private static boolean isTerminal(@NonNull YoDownload.State state) {
