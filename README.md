@@ -73,7 +73,7 @@ $env:JAVA_HOME = "D:\Dev\Env\Java\jdk-21"
   任务页是卡片列表（缩略图兼平台标识 / 标题 + 进度 + 状态 / 一个主操作），按「全部 / 进行中 / 已结束」筛选，
   卡片上暂停 / 继续 / 重试 / 打开，长按取消 / 分享 / 删除，页菜单全部暂停 / 全部继续。
   下载由前台服务承载（通知栏显示进度、可全部暂停）；断网自动等待、恢复后续传，直链过期自动重新解析。
-  设置页每项一张独立单行列表：颜色模式（下拉）、剪贴板、仅 Wi‑Fi 下载、同时下载数（1–3，下拉）、保存位置、关于。
+  设置页每节一张独立列表（外观 / 解析 / 下载 / 关于）：颜色模式（下拉）、剪贴板、仅 Wi‑Fi 下载、同时下载数（1–3，下拉）、保存位置、清除已结束任务、关于。
   `verifyYouiApiBoundary`（挂在 preBuild）保证 app 只引用 `com.yohu.youi.api.*`。
 - 界面截图：`./gradlew :app:testDebugUnitTest --tests '*UiScreenshotTest*'`，
   Robolectric 渲染浅色 / 深色各 10 张到 `app/build/screenshots/`（非真机，仅用于排版自查）。
