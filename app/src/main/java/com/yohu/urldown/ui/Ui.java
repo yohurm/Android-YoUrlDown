@@ -7,13 +7,10 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.widget.NestedScrollView;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.yohu.youi.api.common.YoCorner;
 import com.yohu.youi.api.theme.YoColors;
@@ -126,27 +123,6 @@ public final class Ui {
     public static LinearLayout.LayoutParams wrap() {
         return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    /** 在视图树里找第一个纵向滚动容器（YoList 的根视图外面可能还包着刷新层）。 */
-    @Nullable
-    public static View findScroller(@Nullable View view) {
-        if (view == null) {
-            return null;
-        }
-        if (view instanceof RecyclerView || view instanceof ScrollView
-                || view instanceof NestedScrollView) {
-            return view;
-        }
-        if (view instanceof ViewGroup group) {
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View found = findScroller(group.getChildAt(i));
-                if (found != null) {
-                    return found;
-                }
-            }
-        }
-        return null;
     }
 
     /** 页标题区的两个可变部分。 */

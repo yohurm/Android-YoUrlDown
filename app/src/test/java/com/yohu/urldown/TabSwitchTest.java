@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertTrue;
 
 /**
- * 页签切换回归：任务页 / 设置页带 YoSegmentButton（控件玻璃），悬浮底栏也是玻璃。
+ * 页签切换回归：任务页带 YoSegmentButton（控件玻璃），悬浮底栏也是玻璃。
  *
  * <p>旧版 YoUI 里控件玻璃“采样背后”时把盖在上面的底栏也画进去，而底栏又采样含该控件的内容层，
  * 两个 RenderNode 互相引用，切到这两页的第一帧渲染线程递归到崩溃（SIGSEGV，整个进程退出）。

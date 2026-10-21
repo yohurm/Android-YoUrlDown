@@ -53,6 +53,7 @@
     <!-- 设置 -->
     <string name="settings_title">设置</string>
     <string name="settings_group_appearance">外观</string>
+    <string name="settings_color_mode">颜色模式</string>
     <string name="settings_color_follow">跟随系统</string>
     <string name="settings_color_light">浅色</string>
     <string name="settings_color_dark">深色</string>
