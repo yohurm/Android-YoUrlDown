@@ -35,10 +35,10 @@ import java.util.List;
  * 设置页。每一项都接着真实功能，没做的能力不先摆开关占位。
  * 下载相关的（仅 Wi‑Fi、同时下载数）改完立刻通知调度器，不用重启任务。
  *
- * <p>每个设置项是一张独立的单行列表，组标题只是文字。不把几项塞进同一张卡：
- * 单行列表的按压水波四角全圆、边距与其他页面的默认列表一致；
- * 按首 / 末行切圆角的样式只属于真正的内部分组列表。
- * 多选一的设置（颜色模式、同时下载数）用下拉菜单，行内只占一个尾随控件的位置。
+ * <p>每一节是一张独立列表，组标题只是列表上方的文字。独立列表的每一行按压水波都是四角全圆，
+ * 与单行列表一致；按首 / 中 / 末行切圆角只属于带组头的内部分组卡片，这里不用。
+ * 行点击按位置分派。多选一的设置（颜色模式、同时下载数）用下拉菜单，行内只占一个尾随控件的位置，
+ * 点整行也能打开菜单。
  */
 public final class SettingsPage implements TabPage {
 
@@ -47,12 +47,16 @@ public final class SettingsPage implements TabPage {
     };
     private static final int MAX_PARALLEL = 3;
 
+    /** 下载一节的行位置：仅 Wi‑Fi、同时下载、保存位置、清除已结束任务。 */
+    private static final int ROW_PARALLEL = 1;
+    private static final int ROW_CLEAR_FINISHED = 3;
+
     private final AppCompatActivity activity;
     private final YoColors colors;
     private final AppSettings settings;
     private final ScrollView scroll;
     private final LinearLayout column;
-    private final List<YoList> lists = new ArrayList<>();
+    private final List<YoList> sections = new ArrayList<>();
     private final YoSelect colorMode;
     private final YoSelect parallel;
 
@@ -75,8 +79,6 @@ public final class SettingsPage implements TabPage {
         column.addView(Ui.pageHeader(activity, colors,
                 activity.getString(R.string.settings_title)).view, Ui.matchWrap());
 
-        // 外观
-        addCaption(R.string.settings_group_appearance);
         YoSelect.Builder colorModes = trailingSelect()
                 .setSelectedItemId(indexOf(settings.colorMode()))
                 .setOnSelectListener((index, text, itemId) -> {
@@ -90,31 +92,6 @@ public final class SettingsPage implements TabPage {
                 .addOption(1, activity.getString(R.string.settings_color_light))
                 .addOption(2, activity.getString(R.string.settings_color_dark));
         colorMode = colorModes.build();
-        addRow(YoList.create(activity)
-                .addItem(ListPrefixSpec.none(),
-                        ListTextSpec.of(activity.getString(R.string.settings_color_mode)),
-                        ListSuffixSpec.custom(colorMode.getView()))
-                .setOnItemClickListener(position -> colorMode.toggle()));
-
-        // 解析
-        addCaption(R.string.settings_group_parse);
-        addRow(YoList.create(activity)
-                .addItem(ListPrefixSpec.none(),
-                        ListTextSpec.of(activity.getString(R.string.settings_clipboard_title),
-                                activity.getString(R.string.settings_clipboard_desc)),
-                        ListSuffixSpec.switch_(settings.clipboardDetect(),
-                                settings::setClipboardDetect)));
-
-        // 下载
-        addCaption(R.string.settings_group_download);
-        addRow(YoList.create(activity)
-                .addItem(ListPrefixSpec.none(),
-                        ListTextSpec.of(activity.getString(R.string.settings_wifi_only_title),
-                                activity.getString(R.string.settings_wifi_only_desc)),
-                        ListSuffixSpec.switch_(settings.wifiOnly(), checked -> {
-                            settings.setWifiOnly(checked);
-                            DownloadRunner.onSettingsChanged();
-                        })));
 
         YoSelect.Builder parallelCounts = trailingSelect()
                 .setSelectedItemId(settings.maxParallel())
@@ -128,29 +105,42 @@ public final class SettingsPage implements TabPage {
             parallelCounts.addOption(n, String.valueOf(n));
         }
         parallel = parallelCounts.build();
-        addRow(YoList.create(activity)
+
+        addSection(R.string.settings_group_appearance, YoList.create(activity)
+                .addItem(ListPrefixSpec.none(),
+                        ListTextSpec.of(activity.getString(R.string.settings_color_mode)),
+                        ListSuffixSpec.custom(colorMode.getView()))
+                .setOnItemClickListener(position -> colorMode.toggle()));
+
+        addSection(R.string.settings_group_parse, YoList.create(activity)
+                .addItem(ListPrefixSpec.none(),
+                        ListTextSpec.of(activity.getString(R.string.settings_clipboard_title),
+                                activity.getString(R.string.settings_clipboard_desc)),
+                        ListSuffixSpec.switch_(settings.clipboardDetect(),
+                                settings::setClipboardDetect)));
+
+        addSection(R.string.settings_group_download, YoList.create(activity)
+                .addItem(ListPrefixSpec.none(),
+                        ListTextSpec.of(activity.getString(R.string.settings_wifi_only_title),
+                                activity.getString(R.string.settings_wifi_only_desc)),
+                        ListSuffixSpec.switch_(settings.wifiOnly(), checked -> {
+                            settings.setWifiOnly(checked);
+                            DownloadRunner.onSettingsChanged();
+                        }))
                 .addItem(ListPrefixSpec.none(),
                         ListTextSpec.of(activity.getString(R.string.settings_parallel_title),
                                 activity.getString(R.string.settings_parallel_desc)),
                         ListSuffixSpec.custom(parallel.getView()))
-                .setOnItemClickListener(position -> parallel.toggle()));
-
-        addRow(YoList.create(activity)
                 .addItem(ListTextSpec.of(activity.getString(R.string.settings_save_dir),
-                        DownloadRunner.downloadDir(activity).getAbsolutePath())));
+                        DownloadRunner.downloadDir(activity).getAbsolutePath()))
+                .addItem(ListTextSpec.destructive(
+                        activity.getString(R.string.settings_clear_finished)))
+                .setOnItemClickListener(this::onDownloadRowClick));
 
-        addRow(YoList.create(activity)
-                .addItem(ListTextSpec.destructive(activity.getString(R.string.settings_clear_finished)))
-                .setOnItemClickListener(position -> confirmClearFinished()));
-
-        // 关于
-        addCaption(R.string.settings_group_about);
-        addRow(YoList.create(activity)
-                .addItemWithLabel(activity.getString(R.string.settings_version), versionLabel()));
-        addRow(YoList.create(activity)
+        addSection(R.string.settings_group_about, YoList.create(activity)
+                .addItemWithLabel(activity.getString(R.string.settings_version), versionLabel())
                 .addItemWithLabel(activity.getString(R.string.settings_platforms),
-                        activity.getString(R.string.settings_platforms_value, platformCount())));
-        addRow(YoList.create(activity)
+                        activity.getString(R.string.settings_platforms_value, platformCount()))
                 .addItemWithLabel(activity.getString(R.string.settings_ui_kit), "YoUI Kit 1.0.0"));
 
         View tail = new View(activity);
@@ -205,23 +195,29 @@ public final class SettingsPage implements TabPage {
                 .setMenuAlign(YoSelect.MenuAlignType.END);
     }
 
-    private void addCaption(@StringRes int textRes) {
-        LinearLayout.LayoutParams lp = Ui.matchWrap();
-        lp.setMargins(dp(Ui.PAGE_PADDING_DP), 0, dp(Ui.PAGE_PADDING_DP), 0);
-        column.addView(Ui.sectionCaption(activity, colors, activity.getString(textRes)), lp);
+    private void onDownloadRowClick(int position) {
+        if (position == ROW_PARALLEL) {
+            parallel.toggle();
+        } else if (position == ROW_CLEAR_FINISHED) {
+            confirmClearFinished();
+        }
     }
 
     /**
-     * 一个设置项一张默认样式的单行列表。卡与卡的间隔就是列表自带的投影留白。
+     * 组标题加一张默认样式的独立列表。节与节的间隔就是列表自带的投影留白。
      *
-     * @param row {@link YoList#create} 起头、配好单行的链，这里收尾 {@code build()}
+     * @param list {@link YoList#create} 起头、配好本节各行的链，这里收尾 {@code build()}
      */
-    private void addRow(@NonNull YoList row) {
-        YoList list = row.build();
-        lists.add(list);
+    private void addSection(@StringRes int captionRes, @NonNull YoList list) {
+        LinearLayout.LayoutParams captionLp = Ui.matchWrap();
+        captionLp.setMargins(dp(Ui.PAGE_PADDING_DP), 0, dp(Ui.PAGE_PADDING_DP), 0);
+        column.addView(Ui.sectionCaption(activity, colors, activity.getString(captionRes)),
+                captionLp);
+        YoList section = list.build();
+        sections.add(section);
         LinearLayout.LayoutParams lp = Ui.matchWrap();
         lp.setMargins(dp(Ui.PAGE_PADDING_DP), 0, dp(Ui.PAGE_PADDING_DP), 0);
-        column.addView(list.getView(), lp);
+        column.addView(section.getView(), lp);
     }
 
     private static int indexOf(ColorMode mode) {
@@ -261,8 +257,8 @@ public final class SettingsPage implements TabPage {
     public void destroy() {
         colorMode.destroy();
         parallel.destroy();
-        for (YoList list : lists) {
-            list.destroy();
+        for (YoList section : sections) {
+            section.destroy();
         }
     }
 }
